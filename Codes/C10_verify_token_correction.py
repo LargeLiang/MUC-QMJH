@@ -11,7 +11,8 @@ def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
         root : Path = Path.cwd()
-    root_path : Path = Path(root)
+    else:
+        root_path : Path = Path(root)
 
     # 整合数据文件位于项目根目录下的 Data/integrated_data/integrated_data.parquet
     return root_path / "Data" / "integrated_data" / "integrated_data.parquet"
@@ -180,7 +181,7 @@ def generate_token_report(file_path: Path, total_rows: int,
     """生成 token 校验分析报告。"""
 
     report_path = output_dir / "R07_token_report.txt"
-    
+
     print("=" * 80)
     print("生成 token 校验分析报告...")
     print("=" * 80)

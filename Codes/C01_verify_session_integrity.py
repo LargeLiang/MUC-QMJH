@@ -8,7 +8,8 @@ def get_parquet_file_paths(root: Path | str | None = None) -> list[Path]:
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
         root : Path = Path.cwd()
-    root_path : Path = Path(root)
+    else:
+        root_path : Path = Path(root)
 
     # 原始数据文件位于项目根目录下的 Data/lmarena-aiarena-human-preference-140k/Data
     data_dir : Path = root_path / "Data" / "lmarena-aiarena-human-preference-140k" / "Data"

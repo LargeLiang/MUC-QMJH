@@ -12,7 +12,8 @@ def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
         root = Path.cwd()
-    root_path = Path(root)
+    else:
+        root_path = Path(root)
 
     # 整合数据文件位于项目根目录下的 Data/integrated_data/integrated_data.parquet
     return root_path / "Data" / "integrated_data" / "integrated_data.parquet"

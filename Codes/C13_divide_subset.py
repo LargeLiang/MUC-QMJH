@@ -8,7 +8,8 @@ def get_optimized_parquet_path(root: Path | str | None = None) -> Path:
 
     if root is None:
         root = Path.cwd()
-    root_path = Path(root)
+    else:
+        root_path = Path(root)
 
     # 优化数据文件位于项目根目录下的 Data/optimized_data/optimized_data.parquet
     return root_path / "Data" / "optimized_data" / "optimized_data.parquet"
