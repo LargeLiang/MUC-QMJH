@@ -1,0 +1,144 @@
+DATA PARQUET AUDIT REPORT
+================================================================================
+
+DIRECTORY: d:\Files\25_10_22_青苗计划\Data\lmarena-aiarena-human-preference-140k\Data
+
+FILE: train-00000-of-00007.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\lmarena-aiarena-human-preference-140k\Data\train-00000-of-00007.parquet
+  ROWS: 19,377
+  COLUMNS (14):
+    id, model_a, model_b, winner, evaluation_session_id, evaluation_order, conversation_a, conversation_b, full_conversation, conv_metadata, category_tag, language, is_code, timestamp
+
+FILE: train-00001-of-00007.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\lmarena-aiarena-human-preference-140k\Data\train-00001-of-00007.parquet
+  ROWS: 19,377
+  COLUMNS (14):
+    id, model_a, model_b, winner, evaluation_session_id, evaluation_order, conversation_a, conversation_b, full_conversation, conv_metadata, category_tag, language, is_code, timestamp
+
+FILE: train-00002-of-00007.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\lmarena-aiarena-human-preference-140k\Data\train-00002-of-00007.parquet
+  ROWS: 19,376
+  COLUMNS (14):
+    id, model_a, model_b, winner, evaluation_session_id, evaluation_order, conversation_a, conversation_b, full_conversation, conv_metadata, category_tag, language, is_code, timestamp
+
+FILE: train-00003-of-00007.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\lmarena-aiarena-human-preference-140k\Data\train-00003-of-00007.parquet
+  ROWS: 19,376
+  COLUMNS (14):
+    id, model_a, model_b, winner, evaluation_session_id, evaluation_order, conversation_a, conversation_b, full_conversation, conv_metadata, category_tag, language, is_code, timestamp
+
+FILE: train-00004-of-00007.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\lmarena-aiarena-human-preference-140k\Data\train-00004-of-00007.parquet
+  ROWS: 19,376
+  COLUMNS (14):
+    id, model_a, model_b, winner, evaluation_session_id, evaluation_order, conversation_a, conversation_b, full_conversation, conv_metadata, category_tag, language, is_code, timestamp
+
+FILE: train-00005-of-00007.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\lmarena-aiarena-human-preference-140k\Data\train-00005-of-00007.parquet
+  ROWS: 19,376
+  COLUMNS (14):
+    id, model_a, model_b, winner, evaluation_session_id, evaluation_order, conversation_a, conversation_b, full_conversation, conv_metadata, category_tag, language, is_code, timestamp
+
+FILE: train-00006-of-00007.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\lmarena-aiarena-human-preference-140k\Data\train-00006-of-00007.parquet
+  ROWS: 19,376
+  COLUMNS (14):
+    id, model_a, model_b, winner, evaluation_session_id, evaluation_order, conversation_a, conversation_b, full_conversation, conv_metadata, category_tag, language, is_code, timestamp
+
+DIRECTORY: d:\Files\25_10_22_青苗计划\Data\integrated_data
+
+FILE: integrated_data.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\integrated_data\integrated_data.parquet
+  ROWS: 135,634
+  COLUMNS (14):
+    id, model_a, model_b, winner, evaluation_session_id, evaluation_order, conversation_a, conversation_b, full_conversation, conv_metadata, category_tag, language, is_code, timestamp
+
+DIRECTORY: d:\Files\25_10_22_青苗计划\Data\optimized_data
+
+FILE: all_categories_data.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\optimized_data\all_categories_data.parquet
+  ROWS: 20
+  COLUMNS (31):
+    id, model_a, model_b, winner, language, is_code, turns, a_conv, b_conv, user_conv, a_tokens, a_header_counts, a_list_counts, a_bold_counts, b_tokens, b_header_counts, b_list_counts, b_bold_counts, user_tokens, creative_writing_bool, creative_writing_score, if_bool, if_score, math_bool, complexity, creativity, domain_knowledge, problem_solving, real_world, specificity, technical_accuracy
+
+FILE: creative_writing_data.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\optimized_data\creative_writing_data.parquet
+  ROWS: 9,036
+  COLUMNS (31):
+    id, model_a, model_b, winner, language, is_code, turns, a_conv, b_conv, user_conv, a_tokens, a_header_counts, a_list_counts, a_bold_counts, b_tokens, b_header_counts, b_list_counts, b_bold_counts, user_tokens, creative_writing_bool, creative_writing_score, if_bool, if_score, math_bool, complexity, creativity, domain_knowledge, problem_solving, real_world, specificity, technical_accuracy
+
+FILE: creative_writing_if_data.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\optimized_data\creative_writing_if_data.parquet
+  ROWS: 1,929
+  COLUMNS (31):
+    id, model_a, model_b, winner, language, is_code, turns, a_conv, b_conv, user_conv, a_tokens, a_header_counts, a_list_counts, a_bold_counts, b_tokens, b_header_counts, b_list_counts, b_bold_counts, user_tokens, creative_writing_bool, creative_writing_score, if_bool, if_score, math_bool, complexity, creativity, domain_knowledge, problem_solving, real_world, specificity, technical_accuracy
+
+FILE: creative_writing_math_data.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\optimized_data\creative_writing_math_data.parquet
+  ROWS: 53
+  COLUMNS (31):
+    id, model_a, model_b, winner, language, is_code, turns, a_conv, b_conv, user_conv, a_tokens, a_header_counts, a_list_counts, a_bold_counts, b_tokens, b_header_counts, b_list_counts, b_bold_counts, user_tokens, creative_writing_bool, creative_writing_score, if_bool, if_score, math_bool, complexity, creativity, domain_knowledge, problem_solving, real_world, specificity, technical_accuracy
+
+FILE: if_data.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\optimized_data\if_data.parquet
+  ROWS: 17,235
+  COLUMNS (31):
+    id, model_a, model_b, winner, language, is_code, turns, a_conv, b_conv, user_conv, a_tokens, a_header_counts, a_list_counts, a_bold_counts, b_tokens, b_header_counts, b_list_counts, b_bold_counts, user_tokens, creative_writing_bool, creative_writing_score, if_bool, if_score, math_bool, complexity, creativity, domain_knowledge, problem_solving, real_world, specificity, technical_accuracy
+
+FILE: if_math_data.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\optimized_data\if_math_data.parquet
+  ROWS: 2,159
+  COLUMNS (31):
+    id, model_a, model_b, winner, language, is_code, turns, a_conv, b_conv, user_conv, a_tokens, a_header_counts, a_list_counts, a_bold_counts, b_tokens, b_header_counts, b_list_counts, b_bold_counts, user_tokens, creative_writing_bool, creative_writing_score, if_bool, if_score, math_bool, complexity, creativity, domain_knowledge, problem_solving, real_world, specificity, technical_accuracy
+
+FILE: math_data.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\optimized_data\math_data.parquet
+  ROWS: 8,876
+  COLUMNS (31):
+    id, model_a, model_b, winner, language, is_code, turns, a_conv, b_conv, user_conv, a_tokens, a_header_counts, a_list_counts, a_bold_counts, b_tokens, b_header_counts, b_list_counts, b_bold_counts, user_tokens, creative_writing_bool, creative_writing_score, if_bool, if_score, math_bool, complexity, creativity, domain_knowledge, problem_solving, real_world, specificity, technical_accuracy
+
+FILE: no_category_data.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\optimized_data\no_category_data.parquet
+  ROWS: 77,145
+  COLUMNS (31):
+    id, model_a, model_b, winner, language, is_code, turns, a_conv, b_conv, user_conv, a_tokens, a_header_counts, a_list_counts, a_bold_counts, b_tokens, b_header_counts, b_list_counts, b_bold_counts, user_tokens, creative_writing_bool, creative_writing_score, if_bool, if_score, math_bool, complexity, creativity, domain_knowledge, problem_solving, real_world, specificity, technical_accuracy
+
+FILE: only_creative_writing_data.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\optimized_data\only_creative_writing_data.parquet
+  ROWS: 7,074
+  COLUMNS (31):
+    id, model_a, model_b, winner, language, is_code, turns, a_conv, b_conv, user_conv, a_tokens, a_header_counts, a_list_counts, a_bold_counts, b_tokens, b_header_counts, b_list_counts, b_bold_counts, user_tokens, creative_writing_bool, creative_writing_score, if_bool, if_score, math_bool, complexity, creativity, domain_knowledge, problem_solving, real_world, specificity, technical_accuracy
+
+FILE: only_if_data.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\optimized_data\only_if_data.parquet
+  ROWS: 13,167
+  COLUMNS (31):
+    id, model_a, model_b, winner, language, is_code, turns, a_conv, b_conv, user_conv, a_tokens, a_header_counts, a_list_counts, a_bold_counts, b_tokens, b_header_counts, b_list_counts, b_bold_counts, user_tokens, creative_writing_bool, creative_writing_score, if_bool, if_score, math_bool, complexity, creativity, domain_knowledge, problem_solving, real_world, specificity, technical_accuracy
+
+FILE: only_math_data.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\optimized_data\only_math_data.parquet
+  ROWS: 6,684
+  COLUMNS (31):
+    id, model_a, model_b, winner, language, is_code, turns, a_conv, b_conv, user_conv, a_tokens, a_header_counts, a_list_counts, a_bold_counts, b_tokens, b_header_counts, b_list_counts, b_bold_counts, user_tokens, creative_writing_bool, creative_writing_score, if_bool, if_score, math_bool, complexity, creativity, domain_knowledge, problem_solving, real_world, specificity, technical_accuracy
+
+FILE: optimized_data.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\optimized_data\optimized_data.parquet
+  ROWS: 108,171
+  COLUMNS (31):
+    id, model_a, model_b, winner, language, is_code, turns, a_conv, b_conv, user_conv, a_tokens, a_header_counts, a_list_counts, a_bold_counts, b_tokens, b_header_counts, b_list_counts, b_bold_counts, user_tokens, creative_writing_bool, creative_writing_score, if_bool, if_score, math_bool, complexity, creativity, domain_knowledge, problem_solving, real_world, specificity, technical_accuracy
+
+DIRECTORY: d:\Files\25_10_22_青苗计划\Data\format_data
+
+FILE: format_data.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\format_data\format_data.parquet
+  ROWS: 157,940
+  COLUMNS (10):
+    header_count, list_count, bold_count, has_header, has_list, has_bold, has_format, total_format, is_winner, model
+
+DIRECTORY: d:\Files\25_10_22_青苗计划\Data\length_data
+
+FILE: length_data.parquet
+  PATH: d:\Files\25_10_22_青苗计划\Data\length_data\length_data.parquet
+  ROWS: 157,940
+  COLUMNS (4):
+    length_ratio, length_diff, is_winner, model

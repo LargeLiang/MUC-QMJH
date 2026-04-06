@@ -1,0 +1,406 @@
+Robust Length Effect Report with Ability/Difficulty Proxy Variables
+========================================================================================================================
+This analysis uses direct longer-wins label, logistic regression, matching, and IPW.
+Derived Ability/Difficulty Proxies:
+  - task_difficulty_index
+  - model_quality_index
+  - practical_context
+  - creative_complex_interaction
+  - code_emphasis
+
+Subset: Overall (n=78970)
+  Longer wins frequency: 0.6221
+  Length ties frequency: 0.0024
+  A longer frequency: 0.4969
+
+Available confounders: user_tokens, turns, is_code, creative_writing_bool, if_bool, math_bool, complexity, creativity, domain_knowledge, problem_solving, real_world, specificity, technical_accuracy
+Available ability/difficulty proxies: task_difficulty_index, model_quality_index, practical_context, creative_complex_interaction, code_emphasis
+
+================================================================================
+Subset: Overall
+Total rows: 78970
+Longer wins rate: 0.6221
+A longer rate: 0.4969
+  Model A (longer_a only):
+    coef=1.0058, OR=2.7341, p=0.0000, R2=0.0442
+  Matching result (longer_a treated vs control):
+    matched treated count: 39236
+    treated winner_a rate: 0.6184
+    control winner_a rate: 0.3826
+    ATE: 0.2358
+    mean propensity distance: 0.0000
+  Covariate Balance Diagnostics (SMD before/after matching):
+    user_tokens: pre=0.0129 -> post=0.0154 (reduction=0.0%) ✓ GOOD
+    turns: pre=0.0114 -> post=0.0284 (reduction=0.0%) ✓ GOOD
+    is_code: pre=0.0055 -> post=0.0038 (reduction=30.4%) ✓ GOOD
+    creative_writing_bool: pre=0.0132 -> post=0.0159 (reduction=0.0%) ✓ GOOD
+    if_bool: pre=0.0076 -> post=0.0239 (reduction=0.0%) ✓ GOOD
+    math_bool: pre=0.0009 -> post=0.0138 (reduction=0.0%) ✓ GOOD
+    complexity: pre=0.0169 -> post=0.0157 (reduction=7.4%) ✓ GOOD
+    creativity: pre=0.0120 -> post=0.0169 (reduction=0.0%) ✓ GOOD
+    domain_knowledge: pre=0.0030 -> post=0.0179 (reduction=0.0%) ✓ GOOD
+    problem_solving: pre=0.0134 -> post=0.0017 (reduction=87.2%) ✓ GOOD
+    real_world: pre=0.0095 -> post=0.0087 (reduction=8.3%) ✓ GOOD
+    specificity: pre=0.0023 -> post=0.0002 (reduction=91.1%) ✓ GOOD
+    technical_accuracy: pre=0.0033 -> post=0.0119 (reduction=0.0%) ✓ GOOD
+    task_difficulty_index: pre=0.0049 -> post=0.0036 (reduction=26.4%) ✓ GOOD
+    model_quality_index: pre=0.0092 -> post=0.0063 (reduction=31.7%) ✓ GOOD
+    practical_context: pre=0.0095 -> post=0.0087 (reduction=8.3%) ✓ GOOD
+    creative_complex_interaction: pre=0.0136 -> post=0.0168 (reduction=0.0%) ✓ GOOD
+    code_emphasis: pre=0.0055 -> post=0.0038 (reduction=30.4%) ✓ GOOD
+  IPW result:
+    weighted treated rate: 0.6185
+    weighted control rate: 0.3723
+    IPW effect: 0.2462
+
+================================================================================
+Subset: Creative Writing
+Total rows: 6605
+Longer wins rate: 0.6061
+A longer rate: 0.5078
+  Model A (longer_a only):
+    coef=0.8725, OR=2.3930, p=0.0000, R2=0.0335
+  Matching result (longer_a treated vs control):
+    matched treated count: 3354
+    treated winner_a rate: 0.6017
+    control winner_a rate: 0.3795
+    ATE: 0.2221
+    mean propensity distance: 0.0000
+  Covariate Balance Diagnostics (SMD before/after matching):
+    user_tokens: pre=0.0204 -> post=0.0094 (reduction=53.8%) ✓ GOOD
+    turns: pre=0.0266 -> post=0.0120 (reduction=55.0%) ✓ GOOD
+    is_code: pre=0.0468 -> post=0.0050 (reduction=89.4%) ✓ GOOD
+    if_bool: pre=0.0067 -> post=0.0202 (reduction=0.0%) ✓ GOOD
+    math_bool: pre=0.0279 -> post=0.0039 (reduction=85.9%) ✓ GOOD
+    complexity: pre=0.0255 -> post=0.0421 (reduction=0.0%) ✓ GOOD
+    creativity: pre=0.0117 -> post=0.0030 (reduction=74.3%) ✓ GOOD
+    domain_knowledge: pre=0.0252 -> post=0.0144 (reduction=42.9%) ✓ GOOD
+    problem_solving: pre=0.0226 -> post=0.0310 (reduction=0.0%) ✓ GOOD
+    real_world: pre=0.0035 -> post=0.0083 (reduction=0.0%) ✓ GOOD
+    specificity: pre=0.0156 -> post=0.0064 (reduction=59.1%) ✓ GOOD
+    technical_accuracy: pre=0.0075 -> post=0.0079 (reduction=0.0%) ✓ GOOD
+    task_difficulty_index: pre=0.0128 -> post=0.0119 (reduction=7.1%) ✓ GOOD
+    model_quality_index: pre=0.0262 -> post=0.0024 (reduction=90.8%) ✓ GOOD
+    practical_context: pre=0.0035 -> post=0.0083 (reduction=0.0%) ✓ GOOD
+    creative_complex_interaction: pre=0.0284 -> post=0.0428 (reduction=0.0%) ✓ GOOD
+    code_emphasis: pre=0.0468 -> post=0.0050 (reduction=89.4%) ✓ GOOD
+  IPW result:
+    weighted treated rate: 0.6016
+    weighted control rate: 0.3883
+    IPW effect: 0.2133
+
+================================================================================
+Subset: Instruction Following
+Total rows: 12356
+Longer wins rate: 0.6066
+A longer rate: 0.4925
+  Model A (longer_a only):
+    coef=0.8719, OR=2.3916, p=0.0000, R2=0.0335
+  Matching result (longer_a treated vs control):
+    matched treated count: 6084
+    treated winner_a rate: 0.5985
+    control winner_a rate: 0.3759
+    ATE: 0.2226
+    mean propensity distance: 0.0000
+  Covariate Balance Diagnostics (SMD before/after matching):
+    user_tokens: pre=0.0426 -> post=0.0163 (reduction=61.7%) ✓ GOOD
+    turns: pre=0.0277 -> post=0.0179 (reduction=35.3%) ✓ GOOD
+    is_code: pre=0.0230 -> post=0.0264 (reduction=0.0%) ✓ GOOD
+    creative_writing_bool: pre=0.0266 -> post=0.0077 (reduction=71.1%) ✓ GOOD
+    math_bool: pre=0.0066 -> post=0.0051 (reduction=22.1%) ✓ GOOD
+    complexity: pre=0.0647 -> post=0.0060 (reduction=90.8%) ✓ GOOD
+    creativity: pre=0.0013 -> post=0.0412 (reduction=0.0%) ✓ GOOD
+    domain_knowledge: pre=0.0191 -> post=0.0133 (reduction=30.2%) ✓ GOOD
+    problem_solving: pre=0.0139 -> post=0.0039 (reduction=72.3%) ✓ GOOD
+    real_world: pre=0.0213 -> post=0.0301 (reduction=0.0%) ✓ GOOD
+    specificity: pre=0.0360 -> post=0.0043 (reduction=88.1%) ✓ GOOD
+    technical_accuracy: pre=0.0313 -> post=0.0098 (reduction=68.8%) ✓ GOOD
+    task_difficulty_index: pre=0.0033 -> post=0.0089 (reduction=0.0%) ✓ GOOD
+    model_quality_index: pre=0.0127 -> post=0.0115 (reduction=9.7%) ✓ GOOD
+    practical_context: pre=0.0213 -> post=0.0301 (reduction=0.0%) ✓ GOOD
+    creative_complex_interaction: pre=0.0456 -> post=0.0277 (reduction=39.3%) ✓ GOOD
+    code_emphasis: pre=0.0230 -> post=0.0264 (reduction=0.0%) ✓ GOOD
+  IPW result:
+    weighted treated rate: 0.5990
+    weighted control rate: 0.3835
+    IPW effect: 0.2155
+
+================================================================================
+Subset: Math
+Total rows: 6063
+Longer wins rate: 0.5801
+A longer rate: 0.4976
+  Model A (longer_a only):
+    coef=0.6529, OR=1.9211, p=0.0000, R2=0.0190
+  Matching result (longer_a treated vs control):
+    matched treated count: 3017
+    treated winner_a rate: 0.5800
+    control winner_a rate: 0.4176
+    ATE: 0.1624
+    mean propensity distance: 0.0000
+  Covariate Balance Diagnostics (SMD before/after matching):
+    user_tokens: pre=0.0357 -> post=0.0238 (reduction=33.4%) ✓ GOOD
+    turns: pre=0.0050 -> post=0.0441 (reduction=0.0%) ✓ GOOD
+    is_code: pre=0.0165 -> post=0.0085 (reduction=48.7%) ✓ GOOD
+    creative_writing_bool: pre=0.0321 -> post=0.0172 (reduction=46.3%) ✓ GOOD
+    if_bool: pre=0.0217 -> post=0.0165 (reduction=23.9%) ✓ GOOD
+    complexity: pre=0.0291 -> post=0.0296 (reduction=0.0%) ✓ GOOD
+    creativity: pre=0.0113 -> post=0.0058 (reduction=48.4%) ✓ GOOD
+    domain_knowledge: pre=0.0218 -> post=0.0087 (reduction=60.2%) ✓ GOOD
+    problem_solving: pre=0.0114 -> post=0.0035 (reduction=68.9%) ✓ GOOD
+    real_world: pre=0.0238 -> post=0.0080 (reduction=66.5%) ✓ GOOD
+    specificity: pre=0.0168 -> post=0.0164 (reduction=2.7%) ✓ GOOD
+    technical_accuracy: pre=0.0092 -> post=0.0168 (reduction=0.0%) ✓ GOOD
+    task_difficulty_index: pre=0.0048 -> post=0.0168 (reduction=0.0%) ✓ GOOD
+    model_quality_index: pre=0.0181 -> post=0.0321 (reduction=0.0%) ✓ GOOD
+    practical_context: pre=0.0238 -> post=0.0080 (reduction=66.5%) ✓ GOOD
+    creative_complex_interaction: pre=0.0126 -> post=0.0022 (reduction=82.3%) ✓ GOOD
+    code_emphasis: pre=0.0165 -> post=0.0085 (reduction=48.7%) ✓ GOOD
+  IPW result:
+    weighted treated rate: 0.5803
+    weighted control rate: 0.4184
+    IPW effect: 0.1618
+
+================================================================================
+Subset: Only Creative Writing
+Total rows: 5179
+Longer wins rate: 0.6127
+A longer rate: 0.5069
+  Model A (longer_a only):
+    coef=0.9295, OR=2.5331, p=0.0000, R2=0.0379
+  Matching result (longer_a treated vs control):
+    matched treated count: 2623
+    treated winner_a rate: 0.6073
+    control winner_a rate: 0.3843
+    ATE: 0.2230
+    mean propensity distance: 0.0000
+  Covariate Balance Diagnostics (SMD before/after matching):
+    user_tokens: pre=0.0052 -> post=0.0160 (reduction=0.0%) ✓ GOOD
+    turns: pre=0.0387 -> post=0.0361 (reduction=6.8%) ✓ GOOD
+    is_code: pre=0.0482 -> post=0.0464 (reduction=3.7%) ✓ GOOD
+    complexity: pre=0.0436 -> post=0.0094 (reduction=78.5%) ✓ GOOD
+    creativity: pre=0.0057 -> post=0.0343 (reduction=0.0%) ✓ GOOD
+    domain_knowledge: pre=0.0260 -> post=0.0310 (reduction=0.0%) ✓ GOOD
+    problem_solving: pre=0.0301 -> post=0.0223 (reduction=25.8%) ✓ GOOD
+    real_world: pre=0.0224 -> post=0.0027 (reduction=88.0%) ✓ GOOD
+    specificity: pre=0.0112 -> post=0.0220 (reduction=0.0%) ✓ GOOD
+    technical_accuracy: pre=0.0041 -> post=0.0036 (reduction=11.3%) ✓ GOOD
+    task_difficulty_index: pre=0.0054 -> post=0.0089 (reduction=0.0%) ✓ GOOD
+    model_quality_index: pre=0.0275 -> post=0.0214 (reduction=22.1%) ✓ GOOD
+    practical_context: pre=0.0224 -> post=0.0027 (reduction=88.0%) ✓ GOOD
+    creative_complex_interaction: pre=0.0443 -> post=0.0047 (reduction=89.3%) ✓ GOOD
+    code_emphasis: pre=0.0482 -> post=0.0464 (reduction=3.7%) ✓ GOOD
+  IPW result:
+    weighted treated rate: 0.6076
+    weighted control rate: 0.3806
+    IPW effect: 0.2270
+
+================================================================================
+Subset: Only IF
+Total rows: 9510
+Longer wins rate: 0.6136
+A longer rate: 0.4907
+  Model A (longer_a only):
+    coef=0.9305, OR=2.5357, p=0.0000, R2=0.0380
+  Model B (longer_a + confounders):
+    coef=0.9357, OR=2.5489, p=0.0000, R2=0.0389
+  Matching result (longer_a treated vs control):
+    matched treated count: 4666
+    treated winner_a rate: 0.6027
+    control winner_a rate: 0.3592
+    ATE: 0.2435
+    mean propensity distance: 0.0000
+  Covariate Balance Diagnostics (SMD before/after matching):
+    user_tokens: pre=0.0414 -> post=0.0208 (reduction=49.7%) ✓ GOOD
+    turns: pre=0.0325 -> post=0.0162 (reduction=50.2%) ✓ GOOD
+    is_code: pre=0.0271 -> post=0.0082 (reduction=69.9%) ✓ GOOD
+    complexity: pre=0.0637 -> post=0.0031 (reduction=95.1%) ✓ GOOD
+    creativity: pre=0.0039 -> post=0.0306 (reduction=0.0%) ✓ GOOD
+    domain_knowledge: pre=0.0046 -> post=0.0119 (reduction=0.0%) ✓ GOOD
+    problem_solving: pre=0.0040 -> post=0.0156 (reduction=0.0%) ✓ GOOD
+    real_world: pre=0.0088 -> post=0.0143 (reduction=0.0%) ✓ GOOD
+    specificity: pre=0.0099 -> post=0.0032 (reduction=67.8%) ✓ GOOD
+    technical_accuracy: pre=0.0255 -> post=0.0138 (reduction=45.7%) ✓ GOOD
+    task_difficulty_index: pre=0.0100 -> post=0.0014 (reduction=86.5%) ✓ GOOD
+    model_quality_index: pre=0.0129 -> post=0.0047 (reduction=63.4%) ✓ GOOD
+    practical_context: pre=0.0088 -> post=0.0143 (reduction=0.0%) ✓ GOOD
+    creative_complex_interaction: pre=0.0479 -> post=0.0220 (reduction=54.2%) ✓ GOOD
+    code_emphasis: pre=0.0271 -> post=0.0082 (reduction=69.9%) ✓ GOOD
+  IPW result:
+    weighted treated rate: 0.6033
+    weighted control rate: 0.3739
+    IPW effect: 0.2294
+
+================================================================================
+Subset: Only Math
+Total rows: 4591
+Longer wins rate: 0.5803
+A longer rate: 0.5005
+  Model A (longer_a only):
+    coef=0.6549, OR=1.9250, p=0.0000, R2=0.0191
+  Model B (longer_a + confounders):
+    coef=0.6628, OR=1.9401, p=0.0000, R2=0.0232
+  Matching result (longer_a treated vs control):
+    matched treated count: 2298
+    treated winner_a rate: 0.5779
+    control winner_a rate: 0.3856
+    ATE: 0.1923
+    mean propensity distance: 0.0000
+  Covariate Balance Diagnostics (SMD before/after matching):
+    user_tokens: pre=0.0353 -> post=0.0021 (reduction=94.0%) ✓ GOOD
+    turns: pre=0.0138 -> post=0.0591 (reduction=0.0%) ✓ GOOD
+    is_code: pre=0.0184 -> post=0.0065 (reduction=64.6%) ✓ GOOD
+    complexity: pre=0.0208 -> post=0.0175 (reduction=15.9%) ✓ GOOD
+    creativity: pre=0.0294 -> post=0.0022 (reduction=92.7%) ✓ GOOD
+    domain_knowledge: pre=0.0192 -> post=0.0080 (reduction=58.1%) ✓ GOOD
+    problem_solving: pre=0.0031 -> post=0.0126 (reduction=0.0%) ✓ GOOD
+    real_world: pre=0.0376 -> post=0.0009 (reduction=97.7%) ✓ GOOD
+    specificity: pre=0.0328 -> post=0.0069 (reduction=79.0%) ✓ GOOD
+    technical_accuracy: pre=0.0006 -> post=0.0142 (reduction=0.0%) ✓ GOOD
+    task_difficulty_index: pre=0.0052 -> post=0.0159 (reduction=0.0%) ✓ GOOD
+    model_quality_index: pre=0.0128 -> post=0.0219 (reduction=0.0%) ✓ GOOD
+    practical_context: pre=0.0376 -> post=0.0009 (reduction=97.7%) ✓ GOOD
+    creative_complex_interaction: pre=0.0376 -> post=0.0089 (reduction=76.3%) ✓ GOOD
+    code_emphasis: pre=0.0184 -> post=0.0065 (reduction=64.6%) ✓ GOOD
+  IPW result:
+    weighted treated rate: 0.5781
+    weighted control rate: 0.4149
+    IPW effect: 0.1633
+
+================================================================================
+Subset: CW & IF
+Total rows: 1407
+Longer wins rate: 0.5849
+A longer rate: 0.5110
+  Model A (longer_a only):
+    coef=0.6925, OR=1.9988, p=0.0000, R2=0.0213
+  Matching result (longer_a treated vs control):
+    matched treated count: 719
+    treated winner_a rate: 0.5828
+    control winner_a rate: 0.3964
+    ATE: 0.1864
+    mean propensity distance: 0.0003
+  Covariate Balance Diagnostics (SMD before/after matching):
+    user_tokens: pre=0.0608 -> post=0.0119 (reduction=80.5%) ✓ GOOD
+    turns: pre=0.0050 -> post=0.0142 (reduction=0.0%) ✓ GOOD
+    is_code: pre=0.0489 -> post=0.0697 (reduction=0.0%) ✓ GOOD
+    math_bool: pre=0.0819 -> post=0.0250 (reduction=69.5%) ✓ GOOD
+    complexity: pre=0.0482 -> post=0.0000 (reduction=100.0%) ✓ GOOD
+    creativity: pre=0.0424 -> post=0.0428 (reduction=0.0%) ✓ GOOD
+    domain_knowledge: pre=0.0372 -> post=0.0702 (reduction=0.0%) ✓ GOOD
+    problem_solving: pre=0.0183 -> post=0.0415 (reduction=0.0%) ✓ GOOD
+    real_world: pre=0.0877 -> post=0.0169 (reduction=80.7%) ✓ GOOD
+    specificity: pre=0.1131 -> post=0.0435 (reduction=61.5%) ✓ GOOD
+    technical_accuracy: pre=0.0217 -> post=0.0419 (reduction=0.0%) ✓ GOOD
+    task_difficulty_index: pre=0.0498 -> post=0.0314 (reduction=37.0%) ✓ GOOD
+    model_quality_index: pre=0.0167 -> post=0.0106 (reduction=36.2%) ✓ GOOD
+    practical_context: pre=0.0877 -> post=0.0169 (reduction=80.7%) ✓ GOOD
+    creative_complex_interaction: pre=0.0389 -> post=0.0085 (reduction=78.3%) ✓ GOOD
+    code_emphasis: pre=0.0489 -> post=0.0697 (reduction=0.0%) ✓ GOOD
+  IPW result:
+    weighted treated rate: 0.5802
+    weighted control rate: 0.4088
+    IPW effect: 0.1714
+
+================================================================================
+Subset: CW & Math
+Total rows: 33
+Longer wins rate: 0.4848
+A longer rate: 0.6061
+  Model A (longer_a only):
+    coef=-0.4055, OR=0.6667, p=0.5911, R2=0.0068
+  Matching result (longer_a treated vs control):
+    matched treated count: 2
+    treated winner_a rate: 0.5000
+    control winner_a rate: 0.5000
+    ATE: 0.0000
+    mean propensity distance: 0.0066
+  Covariate Balance Diagnostics (SMD before/after matching):
+    user_tokens: pre=0.7794 -> post=0.6261 (reduction=19.7%) POOR
+    turns: pre=0.0097 -> post=0.0000 (reduction=100.0%) ✓ GOOD
+    is_code: pre=0.1568 -> post=1.0000 (reduction=0.0%) POOR
+    if_bool: pre=0.3870 -> post=1.0000 (reduction=0.0%) POOR
+    complexity: pre=0.3360 -> post=0.0000 (reduction=100.0%) ✓ GOOD
+    creativity: pre=0.6878 -> post=1.0000 (reduction=0.0%) POOR
+    domain_knowledge: pre=0.4595 -> post=0.0000 (reduction=100.0%) ✓ GOOD
+    problem_solving: pre=0.1069 -> post=0.0000 (reduction=100.0%) ✓ GOOD
+    real_world: pre=0.4607 -> post=1.0000 (reduction=0.0%) POOR
+    specificity: pre=0.2566 -> post=100000000.0000 (reduction=0.0%) POOR
+    technical_accuracy: pre=0.3588 -> post=1.0000 (reduction=0.0%) POOR
+    practical_context: pre=0.4607 -> post=1.0000 (reduction=0.0%) POOR
+    creative_complex_interaction: pre=0.6792 -> post=1.0000 (reduction=0.0%) POOR
+    code_emphasis: pre=0.1568 -> post=1.0000 (reduction=0.0%) POOR
+  IPW result:
+    weighted treated rate: 0.5249
+    weighted control rate: 0.6781
+    IPW effect: -0.1532
+
+================================================================================
+Subset: IF & Math
+Total rows: 1453
+Longer wins rate: 0.5822
+A longer rate: 0.4880
+  Model A (longer_a only):
+    coef=0.6707, OR=1.9557, p=0.0000, R2=0.0200
+  Matching result (longer_a treated vs control):
+    matched treated count: 708
+    treated winner_a rate: 0.5890
+    control winner_a rate: 0.4350
+    ATE: 0.1540
+    mean propensity distance: 0.0003
+  Covariate Balance Diagnostics (SMD before/after matching):
+    user_tokens: pre=0.0343 -> post=0.0927 (reduction=0.0%) ✓ GOOD
+    turns: pre=0.0222 -> post=0.0621 (reduction=0.0%) ✓ GOOD
+    is_code: pre=0.0065 -> post=0.0461 (reduction=0.0%) ✓ GOOD
+    creative_writing_bool: pre=0.0889 -> post=0.0252 (reduction=71.7%) ✓ GOOD
+    complexity: pre=0.0923 -> post=0.0190 (reduction=79.4%) ✓ GOOD
+    creativity: pre=0.0093 -> post=0.0400 (reduction=0.0%) ✓ GOOD
+    domain_knowledge: pre=0.0185 -> post=0.0252 (reduction=0.0%) ✓ GOOD
+    problem_solving: pre=0.0609 -> post=0.0130 (reduction=78.7%) ✓ GOOD
+    real_world: pre=0.0195 -> post=0.0101 (reduction=48.1%) ✓ GOOD
+    specificity: pre=0.0263 -> post=0.0203 (reduction=23.0%) ✓ GOOD
+    technical_accuracy: pre=0.0363 -> post=0.0203 (reduction=44.2%) ✓ GOOD
+    task_difficulty_index: pre=0.0458 -> post=0.0337 (reduction=26.5%) ✓ GOOD
+    model_quality_index: pre=0.0627 -> post=0.0337 (reduction=46.2%) ✓ GOOD
+    practical_context: pre=0.0195 -> post=0.0101 (reduction=48.1%) ✓ GOOD
+    creative_complex_interaction: pre=0.0214 -> post=0.0342 (reduction=0.0%) ✓ GOOD
+    code_emphasis: pre=0.0065 -> post=0.0461 (reduction=0.0%) ✓ GOOD
+  IPW result:
+    weighted treated rate: 0.5884
+    weighted control rate: 0.4217
+    IPW effect: 0.1667
+
+Subset: All Categories skipped due to small sample (14).
+================================================================================
+Subset: No Category
+Total rows: 56825
+Longer wins rate: 0.6298
+A longer rate: 0.4966
+  Model A (longer_a only):
+    coef=1.0720, OR=2.9213, p=0.0000, R2=0.0500
+  Matching result (longer_a treated vs control):
+    matched treated count: 28219
+    treated winner_a rate: 0.6271
+    control winner_a rate: 0.3853
+    ATE: 0.2418
+    mean propensity distance: 0.0000
+  Covariate Balance Diagnostics (SMD before/after matching):
+    user_tokens: pre=0.0024 -> post=0.0162 (reduction=0.0%) ✓ GOOD
+    turns: pre=0.0077 -> post=0.0045 (reduction=41.1%) ✓ GOOD
+    is_code: pre=0.0005 -> post=0.0007 (reduction=0.0%) ✓ GOOD
+    complexity: pre=0.0136 -> post=0.0023 (reduction=83.1%) ✓ GOOD
+    creativity: pre=0.0183 -> post=0.0027 (reduction=85.2%) ✓ GOOD
+    domain_knowledge: pre=0.0068 -> post=0.0026 (reduction=61.2%) ✓ GOOD
+    problem_solving: pre=0.0157 -> post=0.0001 (reduction=99.1%) ✓ GOOD
+    real_world: pre=0.0095 -> post=0.0011 (reduction=88.0%) ✓ GOOD
+    specificity: pre=0.0032 -> post=0.0026 (reduction=20.0%) ✓ GOOD
+    technical_accuracy: pre=0.0047 -> post=0.0006 (reduction=87.7%) ✓ GOOD
+    task_difficulty_index: pre=0.0049 -> post=0.0048 (reduction=2.0%) ✓ GOOD
+    model_quality_index: pre=0.0115 -> post=0.0007 (reduction=94.3%) ✓ GOOD
+    practical_context: pre=0.0095 -> post=0.0011 (reduction=88.0%) ✓ GOOD
+    creative_complex_interaction: pre=0.0143 -> post=0.0019 (reduction=86.5%) ✓ GOOD
+    code_emphasis: pre=0.0005 -> post=0.0007 (reduction=0.0%) ✓ GOOD
+  IPW result:
+    weighted treated rate: 0.6272
+    weighted control rate: 0.3656
+    IPW effect: 0.2617
