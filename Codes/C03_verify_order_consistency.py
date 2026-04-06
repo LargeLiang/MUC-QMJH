@@ -6,8 +6,8 @@ def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
 
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
-        root = Path.cwd()
-    root_path = Path(root)
+        root : Path = Path.cwd()
+    root_path : Path = Path(root)
 
     # 原始数据文件位于项目根目录下的 Data/integrated_data/integrated_data.parquet
     return root_path / "Data" / "integrated_data" / "integrated_data.parquet"
@@ -22,8 +22,9 @@ def verify_order_consistency(file_path: Path | str | None = None) -> None:
 
     # 支持传入自定义文件路径，便于测试或在不同目录下运行脚本
     if file_path is None:
-        file_path = get_integrated_parquet_path()
-    file_path = Path(file_path)
+        file_path : Path = get_integrated_parquet_path()
+    else:        
+        file_path : Path = Path(file_path)
 
     # 如果文件不存在，则输出警告并返回
     print(f"正在分析文件: {file_path}")
@@ -33,7 +34,7 @@ def verify_order_consistency(file_path: Path | str | None = None) -> None:
 
     # 读取 parquet 文件，并对读取异常进行捕获
     try:
-        df = pd.read_parquet(file_path)
+        df : pd.DataFrame = pd.read_parquet(file_path)
     except Exception as exc:
         print(f"  ERROR: 读取 parquet 文件失败: {exc}")
         return
@@ -41,18 +42,18 @@ def verify_order_consistency(file_path: Path | str | None = None) -> None:
     print(f"  读取成功，数据形状: {df.shape}")
 
     # 统计每个 session 中的行数、最大 evaluation_order 和不重复 order 数量
-    session_summary = df.groupby("evaluation_session_id")["evaluation_order"].agg(
+    session_summary : pd.DataFrame = df.groupby("evaluation_session_id")["evaluation_order"].agg(
         count="count",
         max_order="max",
         unique_order_count="nunique"
     )
 
-    max_session_size = int(session_summary["count"].max())
-    max_evaluation_order = int(df["evaluation_order"].max())
-    sessions_with_inconsistent_order = session_summary[
+    max_session_size : int = int(session_summary["count"].max())
+    max_evaluation_order : int = int(df["evaluation_order"].max())
+    sessions_with_inconsistent_order : pd.DataFrame = session_summary[
         session_summary["count"] < session_summary["max_order"]
     ]
-    sessions_with_duplicate_order = session_summary[
+    sessions_with_duplicate_order : pd.DataFrame = session_summary[
         session_summary["count"] > session_summary["unique_order_count"]
     ]
 

@@ -9,8 +9,8 @@ def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
 
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
-        root = Path.cwd()
-    root_path = Path(root)
+        root : Path = Path.cwd()
+    root_path : Path = Path(root)
 
     # 整合数据文件位于项目根目录下的 Data/integrated_data/integrated_data.parquet
     return root_path / "Data" / "integrated_data" / "integrated_data.parquet"
@@ -25,14 +25,15 @@ def touch_order(file_path: Path | str | None = None, output_dir: Path | str | No
 
     # 支持传入自定义文件路径，便于测试或在不同目录下运行脚本
     if file_path is None:
-        file_path = get_integrated_parquet_path()
-    file_path = Path(file_path)
+        file_path : Path = get_integrated_parquet_path()
+    else:
+        file_path : Path = Path(file_path)
 
     # 默认输出目录为当前工作目录下的 Reports
     if output_dir is None:
-        output_dir = Path.cwd() / "Reports"
+        output_dir : Path = Path.cwd() / "Reports"
     else:
-        output_dir = Path(output_dir)
+        output_dir : Path = Path(output_dir)
 
     # 提前创建输出目录，避免后续保存时因目录不存在失败
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -45,7 +46,7 @@ def touch_order(file_path: Path | str | None = None, output_dir: Path | str | No
 
     # 读取 parquet 文件，并对读取异常进行捕获
     try:
-        df = pd.read_parquet(file_path)
+        df : pd.DataFrame = pd.read_parquet(file_path)
     except Exception as exc:
         print(f"  ERROR: 读取 parquet 文件失败: {exc}")
         return
@@ -53,10 +54,10 @@ def touch_order(file_path: Path | str | None = None, output_dir: Path | str | No
     print(f"  读取成功，数据形状: {df.shape}")
 
     # 使用 pandas 高效统计每个 order 值的出现次数
-    order_counts = df["evaluation_order"].value_counts()
+    order_counts : pd.Series = df["evaluation_order"].value_counts()
 
     # 提取唯一 order 值集合
-    unique_evaluation_orders = set(order_counts.index)
+    unique_evaluation_orders : set[int] = set(order_counts.index)
 
     print(f"  发现 {len(unique_evaluation_orders)} 种不同的 evaluation_order 字段值")
     print(f"  分别为 {sorted(unique_evaluation_orders)}")
@@ -80,7 +81,7 @@ def generate_order_report(file_path: Path, total_rows: int,
     报告包括基本信息和出现次数分布，便于了解数据特征。
     """
 
-    report_path = output_dir / "R02_order_report.txt"
+    report_path : Path = output_dir / "R02_order_report.txt"
 
     print("=" * 80)
     print("生成分析报告...")

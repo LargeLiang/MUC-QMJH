@@ -1,51 +1,157 @@
 import pandas as pd
-import os
+import numpy as np
+from pathlib import Path
 from collections import Counter
+from typing import Set
 
-def touch_role():
+
+def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
+    """返回整合数据 parquet 文件的默认路径。"""
+
+    # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
+    if root is None:
+        root : Path = Path.cwd()
+    root_path : Path = Path(root)
+
+    # 整合数据文件位于项目根目录下的 Data/integrated_data/integrated_data.parquet
+    return root_path / "Data" / "integrated_data" / "integrated_data.parquet"
+
+
+def touch_role(file_path: Path | str | None = None, output_dir: Path | str | None = None) -> None:
     """
-    分析 role 字段
+    分析整合数据中的 conversation_a 和 conversation_b 的 role 字段。
+
+    统计各侧对话中 role 标签的出现次数和种类，并生成报告，便于检查对话角色标签分布。
     """
-    file_path = os.getcwd() + r"\Data\integrated_data\integrated_data.parquet"
 
-    unique_a_roles = set()
-    unique_a_role_counts = Counter()
-    unique_b_roles = set()
-    unique_b_role_counts = Counter()
-    
-    print(f"正在分析文件: {os.path.basename(file_path)}")
-    df = pd.read_parquet(file_path)
-    print(f"  数据形状: {df.shape}")
+    # 支持传入自定义文件路径，便于测试或在不同目录下运行脚本
+    if file_path is None:
+        file_path : Path = get_integrated_parquet_path()
+    else:
+        file_path : Path = Path(file_path)
 
-    for idx in range(len(df)):
-        conv_a = df.iloc[idx]['conversation_a']
-        for side in conv_a:
-            a_role = side['role']
-            unique_a_roles.add(a_role)
-            unique_a_role_counts[a_role] += 1
+    # 默认输出目录为当前工作目录下的 Reports
+    if output_dir is None:
+        output_dir : Path = Path.cwd() / "Reports"
+    else:
+        output_dir : Path = Path(output_dir)
+
+    # 提前创建输出目录，避免后续保存时因目录不存在而失败
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # 如果文件不存在，则输出警告并返回
+    print(f"正在分析文件: {file_path}")
+    if not file_path.exists():
+        print(f"  ERROR: 文件不存在: {file_path}")
+        return
+
+    # 读取 parquet 文件，并对读取异常进行捕获
+    try:
+        df : pd.DataFrame = pd.read_parquet(file_path)
+    except Exception as exc:
+        print(f"  ERROR: 读取 parquet 文件失败: {exc}")
+        return
+
+    print(f"  读取成功，数据形状: {df.shape}")
+
+    a_role_counts: Counter = Counter()
+    b_role_counts: Counter = Counter()
+    a_roles: Set[str] = set()
+    b_roles: Set[str] = set()
+
+    # 遍历每条记录，提取 conversation_a / conversation_b 中的 role 标签
+    for row in df.itertuples(index=False):
+        conversation_a : list | tuple | np.ndarray = getattr(row, "conversation_a")
+        conversation_b : list | tuple | np.ndarray = getattr(row, "conversation_b")
+
+        if isinstance(conversation_a, (list, tuple, np.ndarray)):
+            for segment in conversation_a:
+                if not isinstance(segment, dict):
+                    continue
+                role : str | None = segment.get("role")
+                if role is None:
+                    continue
+                a_roles.add(role)
+                a_role_counts[role] += 1
+
+        if isinstance(conversation_b, (list, tuple, np.ndarray)):
+            for segment in conversation_b:
+                if not isinstance(segment, dict):
+                    continue
+                role : str | None = segment.get("role")
+                if role is None:
+                    continue
+                b_roles.add(role)
+                b_role_counts[role] += 1
+
+    print(f"在 conversation_a 中发现 {len(a_roles)} 种不同的 role 值")
+    print(f"在 conversation_b 中发现 {len(b_roles)} 种不同的 role 值")
+
+    generate_role_report(
+        file_path=file_path,
+        total_rows=len(df),
+        a_roles=a_roles,
+        b_roles=b_roles,
+        a_role_counts=a_role_counts,
+        b_role_counts=b_role_counts,
+        output_dir=output_dir,
+    )
 
 
-        conv_b = df.iloc[idx]['conversation_b']
-        for side in conv_b:
-            b_role = side['role']
-            unique_b_roles.add(b_role)
-            unique_b_role_counts[b_role] += 1
+def generate_role_report(file_path: Path, total_rows: int,
+                         a_roles: Set[str], b_roles: Set[str],
+                         a_role_counts: Counter, b_role_counts: Counter,
+                         output_dir: Path) -> None:
+    """
+    生成 role 字段分析报告。
+    """
 
-    print("=" * 80)    
+    report_path = output_dir / "R05_role_report.txt"
 
-    print(f"在 conversation_a 中发现 {len(unique_a_roles)} 种不同的 role 值")
-    print(f"  role 值列表: {sorted(unique_a_roles)}")
-    print(f"  role 值分布: \n   role    数量")
-    for role in sorted(unique_a_roles):
-        print(f"{role:^10}{unique_a_role_counts[role]}")
-    
+    print("=" * 80)
+    print("生成 role 分析报告...")
     print("=" * 80)
 
-    print(f"在 conversation_b 中发现 {len(unique_b_roles)} 种不同的 role 值")
-    print(f"  role 值列表: {sorted(unique_b_roles)}")
-    print(f"  role 值分布: \n   role    数量")
-    for role in sorted(unique_b_roles):
-        print(f"{role:^10}{unique_b_role_counts[role]}")
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write("=" * 80 + "\n")
+        f.write("role 字段分析报告\n")
+        f.write("=" * 80 + "\n\n")
+
+        f.write("1. 基本信息\n")
+        f.write("-" * 100 + "\n")
+        f.write(f"分析文件: {file_path}\n")
+        f.write(f"数据总行数: {total_rows}\n")
+        f.write(f"conversation_a 中 role 种类: {len(a_roles)}\n")
+        f.write(f"conversation_b 中 role 种类: {len(b_roles)}\n\n")
+
+        f.write("2. conversation_a role 分布\n")
+        f.write("-" * 100 + "\n")
+        f.write(f"{'role':^20} {'出现次数':^10}\n")
+        f.write("-" * 100 + "\n")
+        for role in sorted(a_role_counts.keys()):
+            f.write(f"{role:^20} {a_role_counts[role]:^10}\n")
+        f.write("\n")
+
+        f.write("3. conversation_b role 分布\n")
+        f.write("-" * 100 + "\n")
+        f.write(f"{'role':^20} {'出现次数':^10}\n")
+        f.write("-" * 100 + "\n")
+        for role in sorted(b_role_counts.keys()):
+            f.write(f"{role:^20} {b_role_counts[role]:^10}\n")
+        f.write("\n")
+
+        shared_roles = sorted(a_roles.intersection(b_roles))
+        f.write("4. 交集 role 说明\n")
+        f.write("-" * 100 + "\n")
+        f.write(f"conversation_a 与 conversation_b 共有 role 数量: {len(shared_roles)}\n")
+        f.write(f"共有 role 列表: {shared_roles}\n\n")
+
+        f.write("=" * 80 + "\n")
+        f.write("报告生成时间: " + pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S") + "\n")
+        f.write("=" * 80 + "\n")
+
+    print(f"分析报告已保存至: {report_path}")
+
 
 if __name__ == "__main__":
     print("=" * 80)

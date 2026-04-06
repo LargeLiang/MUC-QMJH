@@ -7,11 +7,11 @@ def get_parquet_file_paths(root: Path | str | None = None) -> list[Path]:
 
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
-        root = Path.cwd()
-    root_path = Path(root)
+        root : Path = Path.cwd()
+    root_path : Path = Path(root)
 
     # 原始数据文件位于项目根目录下的 Data/lmarena-aiarena-human-preference-140k/Data
-    data_dir = root_path / "Data" / "lmarena-aiarena-human-preference-140k" / "Data"
+    data_dir : Path = root_path / "Data" / "lmarena-aiarena-human-preference-140k" / "Data"
     return [data_dir / f"train-{i:05d}-of-00007.parquet" for i in range(7)]
 
 
@@ -23,21 +23,21 @@ def integrate_original_data(file_paths: Iterable[Path] | None = None, output_dir
     """
 
     # 支持传入自定义文件路径列表，便于测试或在不同目录下运行脚本
-    if file_paths is None:
-        file_paths = get_parquet_file_paths()
-
     # 将路径集合转为列表，便于多次计算长度和循环访问
-    file_paths = list(file_paths)
+    if file_paths is None:
+        file_paths : list[Path] = get_parquet_file_paths()
+    else:
+        file_paths : list[Path] = list(file_paths)
 
     # 默认输出目录为当前工作目录下的 Data/integrated_data
     if output_dir is None:
-        output_dir = Path.cwd() / "Data" / "integrated_data"
+        output_dir : Path = Path.cwd() / "Data" / "integrated_data"
     else:
-        output_dir = Path(output_dir)
+        output_dir : Path = Path(output_dir)
 
     # 提前创建目录，避免后续保存时因目录不存在而失败
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_file = output_dir / "integrated_data.parquet"
+    output_file : Path = output_dir / "integrated_data.parquet"
 
     # 用于缓存成功读取的 DataFrame 分片
     df_list: list[pd.DataFrame] = []
@@ -47,7 +47,7 @@ def integrate_original_data(file_paths: Iterable[Path] | None = None, output_dir
         print("=" * 80)
         print(f"处理文件 {file_idx}/{len(file_paths)}: {file_path}")
 
-        file_path = Path(file_path)
+        file_path : Path = Path(file_path)
 
         # 如果文件不存在，则输出警告并继续检查下一个文件
         if not file_path.exists():
@@ -56,7 +56,7 @@ def integrate_original_data(file_paths: Iterable[Path] | None = None, output_dir
 
        # 读取 parquet 文件，并对读取异常进行捕获
         try:
-            df = pd.read_parquet(file_path)
+            df : pd.DataFrame = pd.read_parquet(file_path)
         except Exception as exc:
             print(f"  ERROR: 读取 parquet 文件失败: {exc}")
             continue
@@ -75,7 +75,7 @@ def integrate_original_data(file_paths: Iterable[Path] | None = None, output_dir
         return
 
     # 按行合并所有读取到的 DataFrame，避免索引重复
-    integrated_df = pd.concat(df_list, ignore_index=True)
+    integrated_df : pd.DataFrame = pd.concat(df_list, ignore_index=True)
     print(f"合并完成，总行数: {len(integrated_df)}, 总列数: {integrated_df.shape[1]}")
 
     # 将整合结果写入 parquet 文件，并对写入异常进行捕获

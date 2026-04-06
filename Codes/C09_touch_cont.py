@@ -1,135 +1,231 @@
+import numpy as np
 import pandas as pd
-import os
+from pathlib import Path
 from collections import Counter
+from typing import Dict, Set
 
-def touch_cont():
+
+def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
+    """返回整合数据 parquet 文件的默认路径。"""
+
+    # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
+    if root is None:
+        root : Path = Path.cwd()
+    root_path : Path = Path(root)
+
+    # 整合数据文件位于项目根目录下的 Data/integrated_data/integrated_data.parquet
+    return root_path / "Data" / "integrated_data" / "integrated_data.parquet"
+
+
+def touch_cont(file_path: Path | str | None = None, output_dir: Path | str | None = None) -> None:
     """
-    分析 type 字段
+    分析整合数据中 conversation_a 和 conversation_b 的 content 结构。
+
+    统计 content 长度分布，以及 type、text、image、mimeType 的分布情况。
     """
-    file_path = os.getcwd() + r"\Data\integrated_data\integrated_data.parquet"
 
-    # 统计 conversation_a 中的 item 个数，即 len(content)
-    a_cont_item_counts = Counter()
-    # 记录 conversation_a 中 content 缺失的 id 
-    a_missing_cont_ids = set()
+    # 支持传入自定义文件路径，便于测试或在不同目录下运行脚本
+    if file_path is None:
+        file_path : Path = get_integrated_parquet_path()
+    else:
+        file_path : Path = Path(file_path)
 
-    # 统计 conversation_a 中 content 的次级结构：type、text、image、mimeType
-    a_type_counts = Counter()
-    a_text_counts = Counter()
-    a_image_counts = Counter()
-    a_mimeType_counts = Counter()
+    # 默认输出目录为当前工作目录下的 Reports
+    if output_dir is None:
+        output_dir : Path = Path.cwd() / "Reports"
+    else:
+        output_dir : Path = Path(output_dir)
 
-    # 统计 conversation_b 中的 item 个数，即 len(content)
-    b_cont_item_counts = Counter()
-    # 记录 conversation_b 中 content 缺失的 id 
-    b_missing_cont_ids = set()
+    # 提前创建输出目录，避免后续保存时因目录不存在而失败
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    # 统计 conversation_a 中 content 的次级结构：type、text、image、mimeType
-    b_type_counts = Counter()
-    b_text_counts = Counter()
-    b_image_counts = Counter()
-    b_mimeType_counts = Counter()
-    
-    print(f"正在分析文件: {os.path.basename(file_path)}")
-    df = pd.read_parquet(file_path)
-    print(f"  数据形状: {df.shape}")
+    # 如果文件不存在，则输出警告并返回
+    print(f"正在分析文件: {file_path}")
+    if not file_path.exists():
+        print(f"  ERROR: 文件不存在: {file_path}")
+        return
 
-    for idx in range(len(df)):
-        id = df.iloc[idx]['id']
+    # 读取 parquet 文件，并对读取异常进行捕获
+    try:
+        df: pd.DataFrame = pd.read_parquet(file_path)
+    except Exception as exc:
+        print(f"  ERROR: 读取 parquet 文件失败: {exc}")
+        return
 
-        conv_a = df.iloc[idx]['conversation_a']
-        for side in conv_a:
-            a_cont = side['content']
-            a_cont_item_counts[len(a_cont)] += 1
-            if len(a_cont) == 0:
-                a_missing_cont_ids.add(id)
-            else:
-                a_type = a_cont[0]['type']
-                a_type_counts[a_type] += 1
-                a_text = a_cont[0]['text']
-                a_text_counts[a_text] += 1
-                a_image = a_cont[0]['image']
-                a_image_counts[a_image] += 1
-                a_mimeType = a_cont[0]['mimeType']
-                a_mimeType_counts[a_mimeType] += 1
+    print(f"  读取成功，数据形状: {df.shape}")
 
-        conv_b = df.iloc[idx]['conversation_b']
-        for side in conv_b:
-            b_cont = side['content']
-            b_cont_item_counts[len(b_cont)] += 1
-            if len(b_cont) == 0:
-                b_missing_cont_ids.add(id)
-            else:
-                b_type = b_cont[0]['type']
-                b_type_counts[b_type] += 1
-                b_text = b_cont[0]['text']
-                b_text_counts[b_text] += 1
-                b_image = b_cont[0]['image']
-                b_image_counts[b_image] += 1
-                b_mimeType = b_cont[0]['mimeType']
-                b_mimeType_counts[b_mimeType] += 1
+    # 初始化统计变量，包括 content 列表长度分布、次级字段分布，以及缺失 content 的记录 ID 集合
+    a_cont_item_counts: Counter = Counter()
+    b_cont_item_counts: Counter = Counter()
+    a_missing_cont_ids: set = set() 
+    b_missing_cont_ids: set = set()
 
-    print("=" * 80)    
-    
+    # 由于 content 字段是一个列表，我们需要统计每条记录中 content 列表的长度分布，以及其中各项的 type、text、image、mimeType 分布。
+    a_type_counts: Counter = Counter()
+    a_text_counts: Counter = Counter()
+    a_image_counts: Counter = Counter()
+    a_mimeType_counts: Counter = Counter()
+
+    b_type_counts: Counter = Counter()
+    b_text_counts: Counter = Counter()
+    b_image_counts: Counter = Counter()
+    b_mimeType_counts: Counter = Counter()
+
+    # 定义一个辅助函数，用于安全地将 content 字段转换为列表，避免因数据格式问题导致的异常
+    def normalize_content_list(content) -> list:
+        if isinstance(content, (list, tuple, np.ndarray)):
+            return list(content)
+        return []
+
+    for row in df.itertuples(index=False):
+        row_id = getattr(row, "id")
+        conversation_a : list = getattr(row, "conversation_a")
+        conversation_b : list = getattr(row, "conversation_b")
+
+        # 遍历 conversation_a 和 conversation_b 中的每个对话段，统计 content 列表长度分布，以及 type、text、image、mimeType 的分布情况
+        for side in normalize_content_list(conversation_a):
+            if not isinstance(side, dict):
+                continue
+
+            content : list = normalize_content_list(side.get("content"))
+            a_cont_item_counts[len(content)] += 1
+            
+            # 如果 content 列表为空，则记录该行 ID 到 a_missing_cont_ids 集合中，并跳过后续统计
+            if len(content) == 0:
+                a_missing_cont_ids.add(row_id)
+                continue
+
+            for item in content:
+                if not isinstance(item, dict):
+                    continue
+                a_type_counts[item.get("type") or "<missing>"] += 1
+                a_text_counts[item.get("text") or "<missing>"] += 1
+                a_image_counts[item.get("image") or "<missing>"] += 1
+                a_mimeType_counts[item.get("mimeType") or "<missing>"] += 1
+
+        for side in normalize_content_list(conversation_b):
+            if not isinstance(side, dict):
+                continue
+
+            content : list = normalize_content_list(side.get("content"))
+            b_cont_item_counts[len(content)] += 1
+            
+            # 如果 content 列表为空，则记录该行 ID 到 b_missing_cont_ids 集合中，并跳过后续统计
+            if len(content) == 0:
+                b_missing_cont_ids.add(row_id)
+                continue
+            
+            for item in content:
+                if not isinstance(item, dict):
+                    continue
+                b_type_counts[item.get("type") or "<missing>"] += 1
+                b_text_counts[item.get("text") or "<missing>"] += 1
+                b_image_counts[item.get("image") or "<missing>"] += 1
+                b_mimeType_counts[item.get("mimeType") or "<missing>"] += 1
+
     print(f"在 conversation_a 中发现 {len(a_cont_item_counts)} 种 len(content) 值")
-    print(f"  len(content) 值列表: {sorted(a_cont_item_counts.keys())}")
-    print(f"  len(content) 值分布: \n    len(content)      数量")
-    for item in sorted(a_cont_item_counts.keys()):
-        print(f"    {item:^15}{a_cont_item_counts[item]:^10}")
-    
-    print("-" * 80)  
-
-    print(f"在 conversation_a 中发现 {len(a_type_counts)} 种 type 值")
-    print(f"  type 值列表: {sorted(a_type_counts.keys())}")
-
-    print("-" * 80)  
-
-    print(f"在 conversation_a 中发现 {len(a_text_counts)} 种 text 值")
-    print(" 最常出现的text（前3）为：")
-    a_common_texts = a_text_counts.most_common(10)
-    for idx in range(3):
-        print(f"  {a_common_texts[idx]}")
-
-    print("-" * 80)  
-
-    print(f"在 conversation_a 中发现 {len(a_image_counts)} 种 image 值")
-    print(f"  image 值列表: {sorted(a_image_counts.keys())}")
-
-    print("-" * 80)
-
-    print(f"在 conversation_a 中发现 {len(a_mimeType_counts)} 种 mimeType 值")
-    print(f"  mimeType 值列表: {sorted(a_mimeType_counts.keys())}")
-
-    print("=" * 80)    
-    
     print(f"在 conversation_b 中发现 {len(b_cont_item_counts)} 种 len(content) 值")
-    print(f"  len(content) 值列表: {sorted(b_cont_item_counts.keys())}")
-    print(f"  len(content) 值分布: \n    len(content)      数量")
-    for item in sorted(b_cont_item_counts.keys()):
-        print(f"    {item:^15}{b_cont_item_counts[item]:^10}")
-    
-    print("-" * 80)  
+    print(f"conversation_a 缺失 content 的行数: {len(a_missing_cont_ids)}")
+    print(f"conversation_b 缺失 content 的行数: {len(b_missing_cont_ids)}")
 
-    print(f"在 conversation_b 中发现 {len(b_type_counts)} 种 type 值")
-    print(f"  type 值列表: {sorted(b_type_counts.keys())}")
+    generate_cont_report(
+        file_path=file_path,
+        total_rows=len(df),
+        a_cont_item_counts=a_cont_item_counts,
+        b_cont_item_counts=b_cont_item_counts,
+        a_type_counts=a_type_counts,
+        b_type_counts=b_type_counts,
+        a_text_counts=a_text_counts,
+        b_text_counts=b_text_counts,
+        a_image_counts=a_image_counts,
+        b_image_counts=b_image_counts,
+        a_mimeType_counts=a_mimeType_counts,
+        b_mimeType_counts=b_mimeType_counts,
+        a_missing_cont_ids=a_missing_cont_ids,
+        b_missing_cont_ids=b_missing_cont_ids,
+        output_dir=output_dir,
+    )
 
-    print("-" * 80)  
 
-    print(f"在 conversation_b 中发现 {len(b_text_counts)} 种 text 值")
-    print(" 最常出现的text（前3）为：")
-    b_common_texts = b_text_counts.most_common(10)
-    for idx in range(3):
-        print(f"  {b_common_texts[idx]}")
+def generate_cont_report(file_path: Path, total_rows: int,
+                         a_cont_item_counts: Counter,
+                         b_cont_item_counts: Counter,
+                         a_type_counts: Counter,
+                         b_type_counts: Counter,
+                         a_text_counts: Counter,
+                         b_text_counts: Counter,
+                         a_image_counts: Counter,
+                         b_image_counts: Counter,
+                         a_mimeType_counts: Counter,
+                         b_mimeType_counts: Counter,
+                         a_missing_cont_ids: set,
+                         b_missing_cont_ids: set,
+                         output_dir: Path) -> None:
+    """生成 content 字段分析报告。"""
 
-    print("-" * 80)  
+    report_path = output_dir / "R06_cont_report.txt"
+    print("=" * 80)
+    print("生成 content 分析报告...")
+    print("=" * 80)
 
-    print(f"在 conversation_b 中发现 {len(b_image_counts)} 种 image 值")
-    print(f"  image 值列表: {sorted(b_image_counts.keys())}")
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write("=" * 80 + "\n")
+        f.write("content 字段分析报告\n")
+        f.write("=" * 80 + "\n\n")
 
-    print("-" * 80)
+        f.write("1. 基本信息\n")
+        f.write("-" * 100 + "\n")
+        f.write(f"分析文件: {file_path}\n")
+        f.write(f"数据总行数: {total_rows}\n")
+        f.write(f"conversation_a 缺失 content 行数: {len(a_missing_cont_ids)}\n")
+        f.write(f"conversation_b 缺失 content 行数: {len(b_missing_cont_ids)}\n\n")
 
-    print(f"在 conversation_b 中发现 {len(b_mimeType_counts)} 种 mimeType 值")
-    print(f"  mimeType 值列表: {sorted(b_mimeType_counts.keys())}")
+        f.write("2. conversation_a content 长度分布\n")
+        f.write("-" * 100 + "\n")
+        f.write(f"{'len(content)':>12} {'数量':>10}\n")
+        f.write("-" * 100 + "\n")
+        for length in sorted(a_cont_item_counts.keys()):
+            f.write(f"{length:>12} {a_cont_item_counts[length]:>10}\n")
+        f.write("\n")
+
+        f.write("3. conversation_b content 长度分布\n")
+        f.write("-" * 100 + "\n")
+        f.write(f"{'len(content)':>12} {'数量':>10}\n")
+        f.write("-" * 100 + "\n")
+        for length in sorted(b_cont_item_counts.keys()):
+            f.write(f"{length:>12} {b_cont_item_counts[length]:>10}\n")
+        f.write("\n")
+
+        f.write("4. conversation_a content 次级字段分布\n")
+        f.write("-" * 100 + "\n")
+        write_counter_section(f, a_type_counts, "type")
+        write_counter_section(f, a_text_counts, "text", top_n=10)
+        write_counter_section(f, a_image_counts, "image")
+        write_counter_section(f, a_mimeType_counts, "mimeType")
+
+        f.write("5. conversation_b content 次级字段分布\n")
+        f.write("-" * 100 + "\n")
+        write_counter_section(f, b_type_counts, "type")
+        write_counter_section(f, b_text_counts, "text", top_n=10)
+        write_counter_section(f, b_image_counts, "image")
+        write_counter_section(f, b_mimeType_counts, "mimeType")
+
+        f.write("=" * 80 + "\n")
+        f.write("报告生成时间: " + pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S") + "\n")
+        f.write("=" * 80 + "\n")
+
+    print(f"分析报告已保存至: {report_path}")
+
+
+def write_counter_section(f, counter: Counter, label: str, top_n: int = 5) -> None:
+    """将 Counter 统计结果写入报告，默认只显示 top_n 项。"""
+    f.write(f"{label} 值种类: {len(counter)}\n")
+    f.write(f"{label} 值列表（前 {top_n}）：{[item for item, _ in counter.most_common(top_n)]}\n")
+    f.write(f"{label} 分布（前 {top_n}）：\n")
+    for value, count in counter.most_common(top_n):
+        f.write(f"  {value!r}: {count}\n")
+    f.write("\n")
+
 
 if __name__ == "__main__":
     print("=" * 80)

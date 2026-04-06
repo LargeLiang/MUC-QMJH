@@ -9,8 +9,8 @@ def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
 
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
-        root = Path.cwd()
-    root_path = Path(root)
+        root : Path = Path.cwd()
+    root_path : Path = Path(root)
 
     # 整合数据文件位于项目根目录下的 Data/integrated_data/integrated_data.parquet
     return root_path / "Data" / "integrated_data" / "integrated_data.parquet"
@@ -26,14 +26,15 @@ def touch_turn(file_path: Path | str | None = None, output_dir: Path | str | Non
 
     # 支持传入自定义文件路径，便于测试或在不同目录下运行脚本
     if file_path is None:
-        file_path = get_integrated_parquet_path()
-    file_path = Path(file_path)
+        file_path : Path = get_integrated_parquet_path()
+    else:
+        file_path : Path = Path(file_path)
 
     # 默认输出目录为当前工作目录下的 Reports
     if output_dir is None:
-        output_dir = Path.cwd() / "Reports"
+        output_dir : Path = Path.cwd() / "Reports"
     else:
-        output_dir = Path(output_dir)
+        output_dir : Path = Path(output_dir)
 
     # 提前创建输出目录，避免后续写入失败
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -46,29 +47,29 @@ def touch_turn(file_path: Path | str | None = None, output_dir: Path | str | Non
 
     # 读取 parquet 文件，并对读取异常进行捕获
     try:
-        df = pd.read_parquet(file_path)
+        df : pd.DataFrame = pd.read_parquet(file_path)
     except Exception as exc:
         print(f"  ERROR: 读取 parquet 文件失败: {exc}")
         return
 
     print(f"  读取成功，数据形状: {df.shape}")
 
-    required_columns = {"id", "conversation_a", "conversation_b", "conv_metadata"}
-    missing_columns = required_columns.difference(df.columns)
+    required_columns : set[str] = {"id", "conversation_a", "conversation_b", "conv_metadata"}
+    missing_columns : set[str] = required_columns.difference(df.columns)
     if missing_columns:
         print(f"  ERROR: 缺少必要字段: {sorted(missing_columns)}")
         return
 
     # 用于统计各 turns 值出现频率
-    turn_counts: Counter = Counter()
+    turn_counts : Counter = Counter()
 
     # 检验 conv_a 与 conv_b 长度一致性
-    mismatch_conv_length = False
-    mismatch_conv_length_ids: Set[str] = set()
+    mismatch_conv_length : bool = False
+    mismatch_conv_length_ids : Set[str] = set()
 
     # 检验 conv_a 长度与 turns 关系
-    mismatch_turn_value = False
-    mismatch_turn_ids: Set[str] = set()
+    mismatch_turn_value : bool = False
+    mismatch_turn_ids : Set[str] = set()
 
     for row in df.itertuples(index=False):
         row_id = getattr(row, "id")
@@ -88,7 +89,7 @@ def touch_turn(file_path: Path | str | None = None, output_dir: Path | str | Non
             mismatch_conv_length = True
             mismatch_conv_length_ids.add(row_id)
 
-        expected_turn = len(conv_a) // 2
+        expected_turn : int = len(conv_a) // 2
         if expected_turn != turn:
             mismatch_turn_value = True
             mismatch_turn_ids.add(row_id)

@@ -1,0 +1,90 @@
+================================================================================
+content 字段分析报告
+================================================================================
+
+1. 基本信息
+----------------------------------------------------------------------------------------------------
+分析文件: D:\Files\MUC-QMJH\Data\integrated_data\integrated_data.parquet
+数据总行数: 135634
+conversation_a 缺失 content 行数: 93
+conversation_b 缺失 content 行数: 82
+
+2. conversation_a content 长度分布
+----------------------------------------------------------------------------------------------------
+len(content)         数量
+----------------------------------------------------------------------------------------------------
+           0        109
+           1     341999
+
+3. conversation_b content 长度分布
+----------------------------------------------------------------------------------------------------
+len(content)         数量
+----------------------------------------------------------------------------------------------------
+           0         91
+           1     342017
+
+4. conversation_a content 次级字段分布
+----------------------------------------------------------------------------------------------------
+type 值种类: 1
+type 值列表（前 5）：['text']
+type 分布（前 5）：
+  'text': 341999
+
+text 值种类: 332635
+text 值列表（前 10）：['I’m sorry, but I can’t help with that.', 'Hello! How can I help you today?', 'Hello! How can I assist you today?', 'blub', '↑ 内容の本質だけ箇条書きで、字数を １８０文字 以内で、まとめて ', 'Hello! How can I assist you today? 😊', 'What is the capital of Taiwan?', 'Hi there! How can I help you today?', "I can't help with that.", 'Hello there! How can I help you today?']
+text 分布（前 10）：
+  'I’m sorry, but I can’t help with that.': 79
+  'Hello! How can I help you today?': 43
+  'Hello! How can I assist you today?': 33
+  'blub': 25
+  '↑ 内容の本質だけ箇条書きで、字数を １８０文字 以内で、まとめて ': 20
+  'Hello! How can I assist you today? 😊': 20
+  'What is the capital of Taiwan?': 14
+  'Hi there! How can I help you today?': 14
+  "I can't help with that.": 12
+  'Hello there! How can I help you today?': 12
+
+image 值种类: 1
+image 值列表（前 5）：['<missing>']
+image 分布（前 5）：
+  '<missing>': 341999
+
+mimeType 值种类: 1
+mimeType 值列表（前 5）：['<missing>']
+mimeType 分布（前 5）：
+  '<missing>': 341999
+
+5. conversation_b content 次级字段分布
+----------------------------------------------------------------------------------------------------
+type 值种类: 1
+type 值列表（前 5）：['text']
+type 分布（前 5）：
+  'text': 342017
+
+text 值种类: 332621
+text 值列表（前 10）：['I’m sorry, but I can’t help with that.', 'Hello! How can I help you today?', 'Hello! How can I assist you today?', 'blub', 'Hello! How can I assist you today? 😊', 'Hi there! How can I help you today?', '↑ 内容の本質だけ箇条書きで、字数を １８０文字 以内で、まとめて ', "I'm sorry, but I can't comply with that.", 'Hello! 😊 How can I help you today?', '3']
+text 分布（前 10）：
+  'I’m sorry, but I can’t help with that.': 89
+  'Hello! How can I help you today?': 51
+  'Hello! How can I assist you today?': 29
+  'blub': 25
+  'Hello! How can I assist you today? 😊': 21
+  'Hi there! How can I help you today?': 20
+  '↑ 内容の本質だけ箇条書きで、字数を １８０文字 以内で、まとめて ': 20
+  "I'm sorry, but I can't comply with that.": 18
+  'Hello! 😊 How can I help you today?': 15
+  '3': 15
+
+image 值种类: 1
+image 值列表（前 5）：['<missing>']
+image 分布（前 5）：
+  '<missing>': 342017
+
+mimeType 值种类: 1
+mimeType 值列表（前 5）：['<missing>']
+mimeType 分布（前 5）：
+  '<missing>': 342017
+
+================================================================================
+报告生成时间: 2026-04-06 12:16:56
+================================================================================

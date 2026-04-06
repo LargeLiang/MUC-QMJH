@@ -7,11 +7,11 @@ def get_parquet_file_paths(root: Path | str | None = None) -> list[Path]:
 
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
-        root = Path.cwd()
-    root_path = Path(root)
+        root : Path = Path.cwd()
+    root_path : Path = Path(root)
 
     # 原始数据文件位于项目根目录下的 Data/lmarena-aiarena-human-preference-140k/Data
-    data_dir = root_path / "Data" / "lmarena-aiarena-human-preference-140k" / "Data"
+    data_dir : Path = root_path / "Data" / "lmarena-aiarena-human-preference-140k" / "Data"
     return [data_dir / f"train-{i:05d}-of-00007.parquet" for i in range(7)]
 
 
@@ -25,10 +25,9 @@ def verify_session_integrity(file_paths: Iterable[Path] | None = None) -> None:
 
     # 支持传入自定义文件路径列表，便于测试或在不同目录下运行脚本
     if file_paths is None:
-        file_paths = get_parquet_file_paths()
-
-    # 将路径集合转为列表，便于多次计算长度和循环访问
-    file_paths = list(file_paths)
+        file_paths : list[Path] = get_parquet_file_paths()
+    else:
+        file_paths : list[Path] = list(file_paths)
 
     # 用于存储所有处理文件中去重后的 session_id
     all_unique_session_ids: set = set()
@@ -52,7 +51,7 @@ def verify_session_integrity(file_paths: Iterable[Path] | None = None) -> None:
 
         # 读取 parquet 文件，并对读取异常进行捕获
         try:
-            df = pd.read_parquet(file_path)
+            df : pd.DataFrame= pd.read_parquet(file_path)
         except Exception as exc:
             print(f"  ERROR: 读取 parquet 文件失败: {exc}")
             continue
@@ -61,7 +60,7 @@ def verify_session_integrity(file_paths: Iterable[Path] | None = None) -> None:
         print(f"  读取成功，数据形状: {df.shape}")
 
         # 直接通过 pandas 提取当前文件中唯一的 session_id
-        unique_session_ids = set(df["evaluation_session_id"].dropna().unique())
+        unique_session_ids : set = set(df["evaluation_session_id"].dropna().unique())
         print(f"  发现 {len(unique_session_ids)} 种不同的 evaluation_session_id")
 
         # 累加全局唯一 session_id 并统计当前文件的唯一值数量
@@ -88,7 +87,7 @@ if __name__ == "__main__":
     print("=" * 80)
     print("验证数据分割后的会话完整性")
 
-    # file_paths =  # 可选：传入自定义文件路径列表
+    # file_paths : list[Path] =  # 可选：传入自定义文件路径列表
 
     # 调用主函数，可选择传入参数 file_paths
     verify_session_integrity()

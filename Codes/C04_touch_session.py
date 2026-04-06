@@ -9,8 +9,8 @@ def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
 
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
-        root = Path.cwd()
-    root_path = Path(root)
+        root : Path = Path.cwd()
+    root_path : Path = Path(root)
 
     # 整合数据文件位于项目根目录下的 Data/integrated_data/integrated_data.parquet
     return root_path / "Data" / "integrated_data" / "integrated_data.parquet"
@@ -25,14 +25,15 @@ def touch_session(file_path: Path | str | None = None, output_dir: Path | str | 
 
     # 支持传入自定义文件路径，便于测试或在不同目录下运行脚本
     if file_path is None:
-        file_path = get_integrated_parquet_path()
-    file_path = Path(file_path)
+        file_path : Path = get_integrated_parquet_path()
+    else:
+        file_path : Path = Path(file_path)
 
     # 默认输出目录为当前工作目录下的 Reports
     if output_dir is None:
-        output_dir = Path.cwd() / "Reports"
+        output_dir : Path = Path.cwd() / "Reports"
     else:
-        output_dir = Path(output_dir)
+        output_dir : Path = Path(output_dir)
 
     # 提前创建输出目录，避免后续保存时因目录不存在而失败
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -45,7 +46,7 @@ def touch_session(file_path: Path | str | None = None, output_dir: Path | str | 
 
     # 读取 parquet 文件，并对读取异常进行捕获
     try:
-        df = pd.read_parquet(file_path)
+        df : pd.DataFrame = pd.read_parquet(file_path)
     except Exception as exc:
         print(f"  ERROR: 读取 parquet 文件失败: {exc}")
         return
@@ -53,14 +54,14 @@ def touch_session(file_path: Path | str | None = None, output_dir: Path | str | 
     print(f"  读取成功，数据形状: {df.shape}")
 
     # 使用 pandas 高效统计每个 session_id 的出现次数
-    session_counts = df["evaluation_session_id"].value_counts()
+    session_counts : pd.Series = df["evaluation_session_id"].value_counts()
 
     # 提取唯一 session_id 集合
-    unique_evaluation_session_ids = set(session_counts.index)
+    unique_evaluation_session_ids : set[str] = set(session_counts.index)
 
     # 找出出现次数大于1的 session_id
-    frequent_evaluation_session_ids = set(session_counts[session_counts > 1].index)
-    frequent_evaluation_session_id_counts = session_counts[session_counts > 1].to_dict()
+    frequent_evaluation_session_ids : set[str] = set(session_counts[session_counts > 1].index)
+    frequent_evaluation_session_id_counts : dict[str, int] = session_counts[session_counts > 1].to_dict()
 
     print(f"  发现 {len(unique_evaluation_session_ids)} 种不同的 evaluation_session_id 字段值")
     print(f"  发现 {len(frequent_evaluation_session_ids)} 种多次出现的 evaluation_session_id 字段值")
