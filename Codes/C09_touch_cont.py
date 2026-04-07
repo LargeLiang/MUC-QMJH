@@ -1,3 +1,17 @@
+"""
+C09_touch_cont
+
+分析整合数据中 conversation 字段内各消息的 content 结构特征。
+
+功能：
+- 检测 content 字段的数据类型（str / list / None）
+- 统计多模态内容（content 为列表时）的结构分布
+- 识别空内容、超长内容等异常情况
+
+数据流向：
+  integrated_data.parquet → conversation 解析 → content 类型统计 → Reports/R06_cont_report.txt
+"""
+
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -10,7 +24,7 @@ def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
 
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
-        root : Path = Path.cwd()
+        root_path : Path = Path.cwd()
     else:
         root_path : Path = Path(root)
 

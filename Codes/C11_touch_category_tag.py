@@ -1,3 +1,17 @@
+"""
+C11_touch_category_tag
+
+分析整合数据中 category_tag 字段各子模块的分布情况。
+
+功能：
+- 解析 category_tag 字典中的多个子字段（类别、任务类型、语言、难度等）
+- 统计每个子字段的唯一值分布及出现频率
+- 识别缺失值、异常值及跨子字段的组合分布
+
+数据流向：
+  integrated_data.parquet → category_tag 字段解析 → 各子模块频率统计 → Reports/R08_category_tag_report.txt
+"""
+
 import pandas as pd
 from pathlib import Path
 from collections import Counter
@@ -9,7 +23,7 @@ def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
 
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
-        root : Path = Path.cwd()
+        root_path : Path = Path.cwd()
     else:
         root_path : Path = Path(root)
 

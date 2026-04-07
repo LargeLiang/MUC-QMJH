@@ -1,8 +1,8 @@
 # MUC-QMJH 数据分析项目总结报告
 
-**项目版本**: v1.0  
-**更新时间**: 2026-04-06  
-**状态**: 进行中
+**项目版本**: v1.2  
+**更新时间**: 2026-04-07  
+**状态**: 进行中（描述性分析完毕，统计检验阶段）
 
 ---
 
@@ -53,8 +53,16 @@
 | C09 | touch_cont | 分析对话内容结构 | R06_cont_report.txt |
 | C10 | verify_token_correction | 验证Token数一致性 | R07_token_report.txt |
 | C11 | touch_category_tag | 分析分类标签 | R08_category_tag_report.txt |
-| C12 | optimize_data | 数据清洗和优化 | R12_optimization_report.txt + optimized_data.parquet |
-| C13 | divide_subset | 按分类划分数据集 | R13_subset_division_report.txt + 18个子集文件 |
+| C12 | optimize_data | 数据清洗和优化 | R09_optimization_report.txt + optimized_data.parquet |
+| C13 | divide_subset | 按分类划分数据集 | R10_division_report.txt + 18个子集文件 |
+| C14 | visualize_length_preference | 长度偏好可视化 | R11_length_preference_report.txt + T01-T02 + P04-P05 |
+| C15 | visualize_format_preference | 格式偏好可视化 | R12_format_preference_report.txt + T03-T08 + P06-P10 |
+| C16 | length_test | Wilcoxon长度偏好检验（10子集） | R13（待执行） |
+| C17 | format_test | 格式偏好检验（Wilcoxon+卡方+LR） | R14（待执行） |
+| C18 | calculate_effect_size | 效应量量化（Cohen's d 等） | R15（待执行） |
+| C19 | pure_effect | 分层逻辑回归净效应 | R16（待执行） |
+| C20 | length_effect_robust | PSM + IPW 稳健性检验 | R17（待执行） |
+| C21 | enhanced_matching_diagnostics | 匹配诊断+能力代理变量 | R18（待执行） |
 
 ### 生成的数据文件
 
@@ -69,8 +77,10 @@ Data/
 │   ├── if_*.parquet                     (按分类)
 │   ├── math_*.parquet                   (按分类)
 │   └── ...                              (18个子集)
-└── length_data/
-    └── length_data.parquet              (长度分析专用)
+├── length_data/
+│   └── length_data.parquet              (长度分析专用)
+└── format_data/
+    └── format_data.parquet              (格式分析专用)
 ```
 
 ### 生成的报告文件
@@ -85,8 +95,8 @@ Reports/
 ├── R06_cont_report.txt                  (内容结构分析)
 ├── R07_token_report.txt                 (Token一致性)
 ├── R08_category_tag_report.txt          (分类标签分析)
-├── R12_optimization_report.txt          (清洗统计)
-└── R13_subset_division_report.txt       (划分统计)
+├── R09_optimization_report.txt          (清洗统计)
+└── R10_division_report.txt       (划分统计)
 ```
 
 ---
@@ -162,6 +172,20 @@ writing  orders orders   subsets intersect data  data
   ├─ 二分类交叉 (3个)
   ├─ 全分类子集 (1个)
   └─ 无分类子集 (1个)
+
+第五层：描述性分析 (C14-C15)
+  ├─ C14: 长度偏好可视化 (双轴折线图 + 分箱统计)
+  └─ C15: 格式偏好可视化 (存在性/数量/组合三维分析)
+
+第六层：统计检验 (C16-C18，待执行)
+  ├─ C16: Wilcoxon 符号秩检验 (长度，10子集)
+  ├─ C17: 格式偏好混合检验 (Wilcoxon + 卡方 + 逻辑回归)
+  └─ C18: 效应量量化 (Cohen's d, Hedges' g, rank-biserial)
+
+第七层：混淆控制 (C19-C21，待执行)
+  ├─ C19: 分层逻辑回归净效应
+  ├─ C20: PSM + IPW 稳健性
+  └─ C21: 匹配诊断 + 能力代理变量
 ```
 
 ### 模块化设计
@@ -357,7 +381,7 @@ print("=" * 80)
 
 **两个独立输出路径**：
 - `data_dir`: 优化数据文件 → `Data/optimized_data/`
-- `report_dir`: 清洗报告 → `Reports/R12_optimization_report.txt`
+- `report_dir`: 清洗报告 → `Reports/R09_optimization_report.txt`
 
 ### C13: divide_subset（数据分割脚本）
 
@@ -547,23 +571,26 @@ turn_num = i // 2 + 1
 
 ## 后续开发建议
 
-### 短期（1-2周）
+### 当前优先（Phase 1 — 修复命名冲突）
 
-- [ ] 完成 C13_visualize_length_preference.py 的分离（图表/表格/报告路径）
-- [ ] 创建数据验证工具集
-- [ ] 添加单元测试
+- [ ] 修复 C16–C21 输出路径 R 编号冲突（详见 References/current_report.md 第八节）
 
-### 中期（1个月）
+### 近期（Phase 2 — 统计检验）
 
-- [ ] 构建数据质量仪表板
-- [ ] 实现自动化数据流水线
-- [ ] 添加数据版本控制
+- [ ] 运行 C16 → R13_wilcoxon_length_test_report.txt
+- [ ] 运行 C17 → R14_format_test_report.txt
+- [ ] 运行 C18 → R15_effect_size_report.txt
 
-### 长期（2-3个月）
+### 中期（Phase 3 — 混淆控制）
 
-- [ ] 支持增量更新
-- [ ] 多数据源集成
-- [ ] 性能优化（大规模数据处理）
+- [ ] 运行 C19 → R16_pure_effect_report.txt
+- [ ] 运行 C20 → R17_length_effect_robust_report.txt
+- [ ] 运行 C21 → R18_enhanced_diagnostics_report.txt
+
+### 长期（Phase 4 — SEM 建模）
+
+- [ ] 编写 C22_sem_path_analysis.py（semopy）
+- [ ] 确认 SEM 中介变量操作化方案（感知层可读性 vs 现有质量维度）
 
 ---
 
@@ -572,7 +599,7 @@ turn_num = i // 2 + 1
 **项目文件**：
 - [C12_optimize_data.py](./Codes/C12_optimize_data.py) - 数据清洗脚本
 - [C13_divide_subset.py](./Codes/C13_divide_subset.py) - 数据划分脚本
-- [R12_optimization_report.txt](./Reports/R12_optimization_report.txt) - 清洗统计
+- [R09_optimization_report.txt](./Reports/R09_optimization_report.txt) - 清洗统计
 
 **相关数据**：
 - 整合数据：`Data/integrated_data/integrated_data.parquet` (135,634行)
@@ -581,6 +608,6 @@ turn_num = i // 2 + 1
 
 ---
 
-**报告生成时间**: 2026-04-06  
+**报告生成时间**: 2026-04-07  
 **报告作者**: GitHub Copilot  
 **项目所有者**: MUC-QMJH Team

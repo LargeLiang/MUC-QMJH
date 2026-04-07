@@ -1,3 +1,17 @@
+"""
+C03_verify_order_consistency
+
+验证整合数据中 evaluation_session_id 与 evaluation_order 的一致性。
+
+功能：
+- 按 session_id 分组，统计记录数、最大 order 值和唯一 order 数
+- 检查是否存在 order 缺失（记录数 < max_order）
+- 检查是否存在 order 重复（记录数 > unique_order_count）
+
+数据流向：
+  integrated_data.parquet → groupby 分组统计 → 控制台一致性结论
+"""
+
 import pandas as pd
 from pathlib import Path
 
@@ -6,7 +20,7 @@ def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
 
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
-        root : Path = Path.cwd()
+        root_path : Path = Path.cwd()
     else:
         root_path : Path = Path(root)
 

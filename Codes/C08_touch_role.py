@@ -1,3 +1,17 @@
+"""
+C08_touch_role
+
+分析整合数据中 conversation 字段内各消息的 role 标签分布。
+
+功能：
+- 遍历每条记录的 conversation 列表，统计 role 字段的取值频率
+- 识别非标准 role 值（user/assistant 以外的标签）
+- 输出 role 分布统计及异常示例
+
+数据流向：
+  integrated_data.parquet → conversation 解析 → role 频率统计 → Reports/R05_role_report.txt
+"""
+
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -10,7 +24,7 @@ def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
 
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
-        root : Path = Path.cwd()
+        root_path : Path = Path.cwd()
     else:
         root_path : Path = Path(root)
 

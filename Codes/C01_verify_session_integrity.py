@@ -1,3 +1,17 @@
+"""
+C01_verify_session_integrity
+
+校验原始 parquet 分片中的 evaluation_session_id 是否跨文件重复。
+
+功能：
+- 逐一读取 train-00000 至 train-00006 共 7 个原始 parquet 分片
+- 统计全局与各文件内的唯一 session_id 数量
+- 若全局去重数 < 各文件唯一数之和，说明同一会话被拆分至不同分片
+
+数据流向：
+  原始 7 个 parquet 分片 → session_id 集合比较 → 控制台结论输出
+"""
+
 import pandas as pd
 from pathlib import Path
 from typing import Iterable
@@ -7,7 +21,7 @@ def get_parquet_file_paths(root: Path | str | None = None) -> list[Path]:
 
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
-        root : Path = Path.cwd()
+        root_path : Path = Path.cwd()
     else:
         root_path : Path = Path(root)
 

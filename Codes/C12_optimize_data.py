@@ -1,3 +1,21 @@
+"""
+C12_optimize_data
+
+对整合数据执行清洗、扁平化和字段工程，生成分析就绪的优化数据集。
+
+功能：
+- 过滤 evaluation_order > 1 的记录（会话历史污染）
+- 过滤 content 为空的记录（content 字段为空 ndarray / 空列表，共 ~175 行）
+- 从 conversation 列表中提取各轮对话文本和 token 数
+- 计算长度特征（sum_user_tokens、a/b 模型响应 token 数）
+- 扁平化 category_tag 字典为独立布尔列（CW / IF / MATH / CODE 四类）
+- 输出包含 32 列的结构化 parquet 文件
+
+数据流向：
+  integrated_data.parquet（135,634 行）→ 清洗+扁平化 → optimized_data.parquet（~108,105 行 × 32 列）
+  + Reports/R09_optimization_report.txt
+"""
+
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -11,7 +29,7 @@ def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
 
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
-        root = Path.cwd()
+        root_path = Path.cwd()
     else:
         root_path = Path(root)
 
@@ -37,12 +55,13 @@ def check_qualification(row) -> Tuple[bool, str]:
         return False, "evaluation_order > 1（非首轮评价，包含Session历史）"
 
     # 2. 检查 conversation_a 的 content 是否为空
+    # parquet 反序列化后 content 可能是 np.ndarray（空数组），需将 np.ndarray 一并纳入判断
     conv_a = row.get("conversation_a")
     if isinstance(conv_a, (list, tuple, np.ndarray)):
         for segment in conv_a:
             if isinstance(segment, dict):
                 content = segment.get("content")
-                if isinstance(content, (list, tuple)) and len(content) == 0:
+                if isinstance(content, (list, tuple, np.ndarray)) and len(content) == 0:
                     return False, "conversation_a 中存在空 content"
 
     # 3. 检查 conversation_b 的 content 是否为空
@@ -51,7 +70,7 @@ def check_qualification(row) -> Tuple[bool, str]:
         for segment in conv_b:
             if isinstance(segment, dict):
                 content = segment.get("content")
-                if isinstance(content, (list, tuple)) and len(content) == 0:
+                if isinstance(content, (list, tuple, np.ndarray)) and len(content) == 0:
                     return False, "conversation_b 中存在空 content"
 
     # 4. 检查 category_tag 的关键评分字段是否为 None
@@ -182,14 +201,19 @@ def optimize_conv_metadata(metadata: Dict) -> Dict:
     return optimized_metadata
 
 
-def optimize_category_tag(category_tag: Dict) -> Dict:
+def optimize_category_tag(category_tag: Dict, is_code: bool = False) -> Dict:
     """
     优化 category_tag 字段。
 
-    从category_tag的多层次嵌套结构中提取三个关键维度模块的核心信息：
+    从category_tag的多层次嵌套结构中提取四个关键维度模块的核心信息：
     - creative_writing：创意写作分类和评分
     - if（instruction following）：指令遵循能力的分类和评分
     - math：数学相关任务分类（仅分类，无评分）
+    - code：代码任务分类（来自 conv_metadata 的 is_code 字段）
+
+    参数说明：
+    - category_tag：原始 category_tag 字典
+    - is_code：是否为代码任务（默认 False，由 is_code 字段传入）
     """
     
     optimized_category_tag = {}
@@ -210,6 +234,9 @@ def optimize_category_tag(category_tag: Dict) -> Dict:
     math_mod = category_tag.get("math_v0.1", {})
     if isinstance(math_mod, dict):
         optimized_category_tag["math_bool"] = math_mod.get("math", False)
+
+    # 4. 代码任务标记（直接来自顶级 is_code 字段，无需解析 category_tag）
+    optimized_category_tag["code_bool"] = bool(is_code)
 
     return optimized_category_tag
 
@@ -353,8 +380,11 @@ def optimize_data(file_path: Path | str | None = None,
             optimized_meta : Dict[str, any] = optimize_conv_metadata(row_dict.get("conv_metadata", {}))
             optimized_row.update(optimized_meta)
 
-            # 4. 优化分类标签：提取关键标签和评分
-            optimized_tags : Dict[str, any] = optimize_category_tag(row_dict.get("category_tag", {}))
+            # 4. 优化分类标签：提取关键标签和评分（含 code_bool）
+            optimized_tags : Dict[str, any] = optimize_category_tag(
+                row_dict.get("category_tag", {}),
+                is_code=bool(row_dict.get("is_code", False))
+            )
             optimized_row.update(optimized_tags)
 
             # 5. 优化评估维度：提取七个评分维度

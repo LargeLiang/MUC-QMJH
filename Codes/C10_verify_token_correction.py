@@ -1,3 +1,17 @@
+"""
+C10_verify_token_correction
+
+校验整合数据中汇总 token 字段与各明细 token 字段之间的一致性。
+
+功能：
+- 对 sum_assistant_a_tokens 等汇总字段与明细字段求和进行比对
+- 识别汇总值与明细之和不一致的记录数和比例
+- 输出各字段的校验通过率
+
+数据流向：
+  integrated_data.parquet → token 字段求和比对 → Reports/R07_token_correction_report.txt
+"""
+
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -10,7 +24,7 @@ def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
 
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
-        root : Path = Path.cwd()
+        root_path : Path = Path.cwd()
     else:
         root_path : Path = Path(root)
 

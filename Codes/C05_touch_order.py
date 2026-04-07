@@ -1,3 +1,16 @@
+"""
+C05_touch_order
+
+分析整合数据中 evaluation_order 字段的分布情况。
+
+功能：
+- 统计 evaluation_order 的唯一值及各值的出现次数
+- 生成按 order 值排序的出现次数分布表
+
+数据流向：
+  integrated_data.parquet → order 值频率统计 → Reports/R02_order_report.txt
+"""
+
 import pandas as pd
 from pathlib import Path
 from collections import Counter
@@ -9,7 +22,7 @@ def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
 
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
-        root : Path = Path.cwd()
+        root_path : Path = Path.cwd()
     else:
         root_path : Path = Path(root)
 

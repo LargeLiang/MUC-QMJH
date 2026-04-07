@@ -1,3 +1,17 @@
+"""
+C04_touch_session
+
+分析整合数据中 evaluation_session_id 字段的分布情况。
+
+功能：
+- 统计唯一 session_id 数量及各 session 的出现次数
+- 识别多次出现的 session（跨 evaluation_order 的会话）
+- 生成出现次数分布表和多次出现 session 的前10详情
+
+数据流向：
+  integrated_data.parquet → session_id 频率统计 → Reports/R01_session_report.txt
+"""
+
 import pandas as pd
 from pathlib import Path
 from collections import Counter
@@ -9,7 +23,7 @@ def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
 
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
-        root : Path = Path.cwd()
+        root_path : Path = Path.cwd()
     else:
         root_path : Path = Path(root)
 

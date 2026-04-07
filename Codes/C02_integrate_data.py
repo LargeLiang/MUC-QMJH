@@ -1,3 +1,17 @@
+"""
+C02_integrate_data
+
+将原始 7 个 parquet 分片合并为单一整合文件。
+
+功能：
+- 逐一读取 train-00000 至 train-00006 共 7 个原始 parquet 分片
+- 使用 pd.concat 合并所有分片并重置索引
+- 输出至 Data/integrated_data/integrated_data.parquet
+
+数据流向：
+  原始 7 个 parquet 分片 → pd.concat → integrated_data.parquet（135,634 行 × 14 列）
+"""
+
 import pandas as pd
 from pathlib import Path
 from typing import Iterable
@@ -7,7 +21,7 @@ def get_parquet_file_paths(root: Path | str | None = None) -> list[Path]:
 
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
-        root : Path = Path.cwd()
+        root_path : Path = Path.cwd()
     else:
         root_path : Path = Path(root)
 

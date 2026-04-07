@@ -1,3 +1,17 @@
+"""
+C07_touch_model
+
+分析整合数据中模型（model_a/model_b）的出场次数与胜率分布。
+
+功能：
+- 统计每个模型出现在 A/B/任意位置的次数
+- 计算各模型的胜率（winner_model_a/b/tie 三类）
+- 输出模型出场数排行榜及胜率汇总表
+
+数据流向：
+  integrated_data.parquet → 模型出场与胜率统计 → Reports/R04_model_report.txt
+"""
+
 import pandas as pd
 from pathlib import Path
 from collections import Counter
@@ -9,7 +23,7 @@ def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
 
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
-        root : Path = Path.cwd()
+        root_path : Path = Path.cwd()
     else:
         root_path : Path = Path(root)
 

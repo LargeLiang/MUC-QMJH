@@ -1,3 +1,17 @@
+"""
+C06_touch_turn
+
+分析整合数据中 turns 字段的分布及其与 conversation 结构的一致性。
+
+功能：
+- 统计 turns 字段的唯一值及各值出现次数
+- 与 conversation 字段中实际对话轮次数进行交叉核验
+- 识别 turns 记录值与实际对话轮次不一致的记录
+
+数据流向：
+  integrated_data.parquet → turns 分布统计 + 一致性校验 → Reports/R03_turn_report.txt
+"""
+
 import pandas as pd
 from pathlib import Path
 from collections import Counter
@@ -9,7 +23,7 @@ def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
 
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
-        root : Path = Path.cwd()
+        root_path : Path = Path.cwd()
     else:
         root_path : Path = Path(root)
 
