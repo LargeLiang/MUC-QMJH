@@ -1,143 +1,399 @@
-# -*- coding: utf-8 -*-
 """
-Format feature preference test
-输入: Data/optimized_data/optimized_data.parquet
-输出: Reports/R11_format_preference_report.txt
+C17_format_test
 
-分析思路：
-1. 计算每个样本中`winner`相对于`loser`的格式特征差异：header/list/bold counts。
-2. 执行 Wilcoxon 符号秩检验 (one-tailed, greater)，测试是否winner具有更高格式计数。
-3. 补充：卡方检验（列联表）和 logistic 回归（说明格式差异是否预测胜率）。
+对优化数据集及各任务类别子集执行格式偏好 Wilcoxon 符号秩检验。
+
+假设（每种格式特征 f ∈ {header, list, bold}）：
+  H₀: median(Δᵢ) = 0
+  H₁: median(Δᵢ) > 0
+  其中 Δᵢ = count_f(获胜模型) − count_f(落败模型)
+
+辅助假设（格式密度，控制长度混淆）：
+  Δᵢ_density = count_f(winner)/(tokens_winner+1) − count_f(loser)/(tokens_loser+1)
+
+仅保留 winner ∈ {model_a, model_b} 的行（排除 tie、both_bad）。
+多重比较：每子集内 3 个特征做 Bonferroni 校正（k=3）。
+
+数据流向：
+  Data/optimized_data/  →  Wilcoxon + 卡方 + 密度检验  →  Reports/R14_format_test_report.txt
 """
-import os
-import pandas as pd
+
 import numpy as np
+import pandas as pd
+from pathlib import Path
 from scipy.stats import wilcoxon, chi2_contingency
-from sklearn.linear_model import LogisticRegression
+from typing import Dict, List, Optional, Tuple
 
 
-def get_count(value):
+def get_data_dir(root: Path | str | None = None) -> Path:
+    """返回优化数据目录的默认路径。"""
+    if root is None:
+        return Path.cwd() / "Data" / "optimized_data"
+    return Path(root) / "Data" / "optimized_data"
+
+
+SUBSETS: List[Tuple[str, str]] = [
+    ("全量",             "optimized_data.parquet"),
+    # 16 个纯净分区（互不重叠，完整覆盖全量）
+    ("无类别",           "no_category_data.parquet"),
+    ("仅创意写作",       "only_cw_data.parquet"),
+    ("仅指令遵循",       "only_if_data.parquet"),
+    ("仅数学",           "only_math_data.parquet"),
+    ("仅代码",           "only_code_data.parquet"),
+    ("创意+指令",        "cw_if_data.parquet"),
+    ("创意+数学",        "cw_math_data.parquet"),
+    ("创意+代码",        "cw_code_data.parquet"),
+    ("指令+数学",        "if_math_data.parquet"),
+    ("指令+代码",        "if_code_data.parquet"),
+    ("数学+代码",        "math_code_data.parquet"),
+    ("创意+指令+数学",   "cw_if_math_data.parquet"),
+    ("创意+指令+代码",   "cw_if_code_data.parquet"),
+    ("创意+数学+代码",   "cw_math_code_data.parquet"),
+    ("指令+数学+代码",   "if_math_code_data.parquet"),
+    ("四类全含",         "all_categories_data.parquet"),
+]
+
+FEATURES = ["header", "list", "bold"]
+MIN_PAIRS = 30
+N_BOOTSTRAP = 1000
+BONFERRONI_K = len(FEATURES)
+
+
+def _dict_sum(value) -> int:
+    """将格式计数字段（dict 或数值）转换为整数总计。"""
     if isinstance(value, dict):
-        return sum(value.values())
-    if pd.isna(value):
+        return int(sum(value.values()))
+    if value is None or (isinstance(value, float) and np.isnan(value)):
         return 0
     try:
-        return float(value)
-    except Exception:
+        return int(value)
+    except (TypeError, ValueError):
         return 0
 
 
-def format_diff(row, feature):
-    a_val = get_count(row[f'a_{feature}_counts'])
-    b_val = get_count(row[f'b_{feature}_counts'])
-    if row['winner'] == 'model_a':
-        return a_val - b_val
-    else:
-        return b_val - a_val
+def _build_paired(df: pd.DataFrame, feature: str
+                  ) -> Tuple[np.ndarray, np.ndarray]:
+    """构造格式计数差值和格式密度差值数组。"""
+    a_col = f"a_{feature}_count"
+    b_col = f"b_{feature}_count"
+
+    a_cnt = df[a_col].apply(_dict_sum).values.astype(np.float64)
+    b_cnt = df[b_col].apply(_dict_sum).values.astype(np.float64)
+    a_tok = df["a_tokens"].values.astype(np.float64)
+    b_tok = df["b_tokens"].values.astype(np.float64)
+
+    winner_is_a = (df["winner"] == "model_a").values
+
+    count_diff = np.where(winner_is_a, a_cnt - b_cnt, b_cnt - a_cnt)
+    a_den = a_cnt / (a_tok + 1)
+    b_den = b_cnt / (b_tok + 1)
+    density_diff = np.where(winner_is_a, a_den - b_den, b_den - a_den)
+
+    return count_diff, density_diff
 
 
-def compute_format_preference_lines(df, label):
-    features = ['header', 'list', 'bold']
-    lines = []
-    lines.append('\n' + '=' * 80)
-    lines.append(f'Subset: {label}')
-    lines.append(f'  total samples: {len(df):,}')
+def _bootstrap_ci(arr: np.ndarray, n_boot: int = N_BOOTSTRAP,
+                  rng: Optional[np.random.Generator] = None
+                  ) -> Tuple[float, float]:
+    """计算中位数的 Bootstrap 百分位 95% CI。"""
+    if rng is None:
+        rng = np.random.default_rng(42)
+    medians = np.array([
+        np.median(rng.choice(arr, size=len(arr), replace=True))
+        for _ in range(n_boot)
+    ])
+    return float(np.percentile(medians, 2.5)), float(np.percentile(medians, 97.5))
 
-    if len(df) == 0:
-        lines.append('  empty subset, skip.')
-        return lines
 
-    # 计算差值
-    for f in features:
-        df[f'{f}_diff'] = df.apply(lambda row: format_diff(row, f), axis=1)
+def _effect_level(r: float) -> str:
+    abs_r = abs(r)
+    if abs_r < 0.1:
+        return "可忽略"
+    elif abs_r < 0.3:
+        return "小"
+    elif abs_r < 0.5:
+        return "中"
+    return "大"
 
-    # Wilcoxon
-    lines.append('\nOne-sample Wilcoxon Signed-Rank Test (H1: diff > 0)')
-    lines.append('-' * 80)
-    for f in features:
-        diff = df[f'{f}_diff']
-        diff_nonzero = diff[diff != 0]
-        if len(diff_nonzero) == 0:
-            lines.append(f'{f}: no nonzero differences, skip')
+
+def _wilcoxon_one(arr: np.ndarray) -> Tuple[float, float, float]:
+    """
+    执行 Wilcoxon 检验，返回 (W, p_raw, r_rb)。
+
+    scipy wilcoxon(alternative='greater') 返回负秩和 W⁻，
+    故 r_rb = 1 - 2W⁻/(n*(n+1))。
+    """
+    nonzero = arr[arr != 0]
+    if len(nonzero) == 0:
+        return np.nan, np.nan, np.nan
+    stat, p = wilcoxon(nonzero, alternative="greater", zero_method="wilcox")
+    n = len(nonzero)
+    r_rb = float(1 - 2 * stat / (n * (n + 1)))
+    return float(stat), float(p), r_rb
+
+
+def _cohens_d(arr: np.ndarray) -> Tuple[float, float]:
+    """
+    计算 Cohen's d 和 Hedges' g（参数效应量，非正态分布下仅供参考）。
+
+    参数说明：
+    - arr：差值数组（含零值）
+
+    返回值：(cohen_d, hedges_g)；非零样本 < 3 时返回 (nan, nan)。
+    """
+    nonzero = arr[arr != 0]
+    n = len(nonzero)
+    if n < 3:
+        return np.nan, np.nan
+    d = float(nonzero.mean() / nonzero.std(ddof=1))
+    g = d * (1 - 3 / (4 * n - 9))
+    return round(d, 4), round(g, 4)
+
+
+def _chisquare_presence(df: pd.DataFrame, feature: str) -> Optional[float]:
+    """对"胜者有格式 vs 败者有格式"构造列联表并执行卡方检验，返回 p 值。"""
+    a_col = f"a_{feature}_count"
+    b_col = f"b_{feature}_count"
+    a_cnt = df[a_col].apply(_dict_sum)
+    b_cnt = df[b_col].apply(_dict_sum)
+    winner_is_a = (df["winner"] == "model_a").values
+    win_has = np.where(winner_is_a, a_cnt > 0, b_cnt > 0).astype(int)
+    los_has = np.where(winner_is_a, b_cnt > 0, a_cnt > 0).astype(int)
+    ct = pd.crosstab(pd.Series(los_has, name="loser_has"),
+                     pd.Series(win_has, name="winner_has"))
+    if ct.shape != (2, 2):
+        return None
+    try:
+        _, p, _, _ = chi2_contingency(ct)
+        return float(p)
+    except Exception:
+        return None
+
+
+def run_one_subset(label: str, df: pd.DataFrame) -> Optional[Dict]:
+    """
+    对单个子集执行全部格式偏好检验。
+
+    参数说明：
+    - label：子集标签
+    - df：已过滤（只含 model_a/model_b winner）的子集
+
+    返回：结果字典，样本不足则返回 None。
+    """
+    n_total = len(df)
+    if n_total < MIN_PAIRS:
+        print(f"  [{label}] 有效对数 {n_total} < {MIN_PAIRS}，跳过")
+        return None
+
+    rng = np.random.default_rng(42)
+    feature_results: List[Dict] = []
+
+    for feat in FEATURES:
+        count_diff, density_diff = _build_paired(df, feat)
+
+        stat, p_raw, r_rb = _wilcoxon_one(count_diff)
+        if np.isnan(p_raw):
             continue
-        stat, p = wilcoxon(diff_nonzero, alternative='greater')
-        pos_count = (diff_nonzero > 0).sum()
-        neg_count = (diff_nonzero < 0).sum()
-        lines.append(f"{f}: n_nonzero={len(diff_nonzero):,}, positive={pos_count:,}, negative={neg_count:,}, statistic={stat:.4f}, p={p:.6f}")
 
-    # sign-like
-    lines.append('\nSign-like preference (胜出者格式更高 vs 低)')
-    lines.append('-' * 80)
-    for f in features:
-        diff = df[f'{f}_diff']
-        pos = (diff > 0).sum()
-        neg = (diff < 0).sum()
-        tie = (diff == 0).sum()
-        ratio = pos / (pos + neg) if (pos + neg) > 0 else np.nan
-        lines.append(f"{f}: positive={pos:,}, negative={neg:,}, tie={tie:,}, pos_ratio={ratio:.3f}")
+        p_adj = min(p_raw * BONFERRONI_K, 1.0)
+        median_diff = float(np.median(count_diff))
+        ci_low, ci_high = _bootstrap_ci(count_diff, rng=rng)
+        n_more = int(np.sum(count_diff > 0))
+        pct_more = n_more / n_total * 100
 
-    lines.append('\nChi-square contingency: Format benefit (diff>0) vs winner')
-    lines.append('-' * 80)
-    for f in features:
-        df[f'{f}_pos'] = (df[f'{f}_diff'] > 0).astype(int)
-        crosstab = pd.crosstab(df[f'{f}_pos'], df['winner'])
-        lines.append(f"{f} crosstab:\n{crosstab.to_string()}\n")
+        _, p_den, _ = _wilcoxon_one(density_diff)
+        median_den = float(np.median(density_diff))
 
-    # logistic regression
-    lines.append('\nLogistic regression（format diff -> model_a胜率）')
-    lines.append('-' * 80)
-    df['winner_a'] = (df['winner'] == 'model_a').astype(int)
-    X = df[[f'{f}_diff' for f in features]].fillna(0).values
-    y = df['winner_a'].values
-    lr = LogisticRegression(max_iter=1000)
-    lr.fit(X, y)
-    lines.append('Coef: ' + ', '.join([f'{features[i]}={lr.coef_[0, i]:.5f}' for i in range(len(features))]))
-    lines.append(f'Intercept: {lr.intercept_[0]:.5f}')
-    lines.append(f'Baseline accuracy: {np.mean(y):.4f}')
-    lines.append(f'Model accuracy (train): {lr.score(X, y):.4f}')
+        p_chi = _chisquare_presence(df, feat)
+        cohen_d, hedges_g = _cohens_d(count_diff)
 
-    return lines
+        feature_results.append({
+            "feature":             feat,
+            "n_pairs":             n_total,
+            "n_winner_more":       n_more,
+            "pct_winner_more":     round(pct_more, 2),
+            "median_diff":         round(median_diff, 3),
+            "ci_low":              round(ci_low, 3),
+            "ci_high":             round(ci_high, 3),
+            "wilcoxon_stat":       stat,
+            "p_value":             p_raw,
+            "p_bonferroni":        round(p_adj, 6),
+            "rank_biserial_r":     round(r_rb, 4),
+            "effect_level":        _effect_level(r_rb),
+            "cohen_d":             cohen_d,
+            "hedges_g":            hedges_g,
+            "significant":         p_adj < 0.05,
+            "density_median_diff": round(median_den, 6),
+            "density_p_value":     float(p_den) if not np.isnan(p_den) else None,
+            "chisq_presence_p":    round(p_chi, 6) if p_chi is not None else None,
+        })
 
+    if not feature_results:
+        return None
 
-def run_format_preference_test():
-    root = os.getcwd()
-    data_path = os.path.join(root, 'Data', 'optimized_data', 'optimized_data.parquet')
-    df = pd.read_parquet(data_path)
-
-    df = df[df['winner'].isin(['model_a', 'model_b'])].copy()
-
-    subsets = {
-        'overall': df,
-        'creative_writing': df[df['creative_writing_bool'] == True],
-        'if': df[df['if_bool'] == True],
-        'math': df[df['math_bool'] == True],
-        'only_creative_writing': df[(df['creative_writing_bool'] == True) & (df['if_bool'] == False) & (df['math_bool'] == False)],
-        'only_if': df[(df['creative_writing_bool'] == False) & (df['if_bool'] == True) & (df['math_bool'] == False)],
-        'only_math': df[(df['creative_writing_bool'] == False) & (df['if_bool'] == False) & (df['math_bool'] == True)],
-        'creative_writing_if': df[(df['creative_writing_bool'] == True) & (df['if_bool'] == True)],
-        'creative_writing_math': df[(df['creative_writing_bool'] == True) & (df['math_bool'] == True)],
-        'if_math': df[(df['if_bool'] == True) & (df['math_bool'] == True)],
-        'all_categories': df[(df['creative_writing_bool'] == True) & (df['if_bool'] == True) & (df['math_bool'] == True)],
-        'no_category': df[(df['creative_writing_bool'] == False) & (df['if_bool'] == False) & (df['math_bool'] == False)],
-    }
-
-    report_lines = []
-    report_lines.append('Format Preference Test Report')
-    report_lines.append('=' * 80)
-    report_lines.append(f'Total samples (valid winner/b loser): {len(df):,}')
-
-    for subset_name, subset_df in subsets.items():
-        report_lines.extend(compute_format_preference_lines(subset_df.copy(), subset_name))
-
-    out_path = os.path.join(root, 'Reports', 'R11_format_preference_report.txt')
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    with open(out_path, 'w', encoding='utf-8') as f:
-        f.write('\n'.join(report_lines))
-
-    # print 1st page for quick check
-    print('\n'.join(report_lines[:40]))
-    print('\nReport saved to:', out_path)
+    return {"label": label, "n_pairs": n_total, "features": feature_results}
 
 
-if __name__ == '__main__':
-    run_format_preference_test()
+def run_format_test(data_dir: Path | str | None = None,
+                    report_dir: Path | str | None = None) -> None:
+    """
+    对所有预定义子集执行格式偏好检验并生成报告。
+
+    参数说明：
+    - data_dir：子集 parquet 文件目录（默认为 Data/optimized_data）
+    - report_dir：报告保存目录（默认为 Reports）
+    """
+    if data_dir is None:
+        data_dir = get_data_dir()
+    else:
+        data_dir = Path(data_dir)
+
+    if report_dir is None:
+        report_dir = Path.cwd() / "Reports"
+    else:
+        report_dir = Path(report_dir)
+
+    report_dir.mkdir(parents=True, exist_ok=True)
+
+    all_results: List[Dict] = []
+
+    print("=" * 80)
+    print("C17 格式偏好 Wilcoxon 符号秩检验（含密度辅助 + 卡方存在性）")
+    print("=" * 80)
+
+    for label, filename in SUBSETS:
+        fpath = data_dir / filename
+        if not fpath.exists():
+            print(f"  [{label}] 文件不存在，跳过：{fpath}")
+            continue
+
+        need_cols = ["winner", "a_tokens", "b_tokens",
+                     "a_header_count", "a_list_count", "a_bold_count",
+                     "b_header_count", "b_list_count", "b_bold_count"]
+        df_raw = pd.read_parquet(fpath, columns=need_cols)
+        df = df_raw[df_raw["winner"].isin(["model_a", "model_b"])].copy()
+        print(f"\n[{label}]  总行数={len(df_raw):,}  有效对数={len(df):,}")
+
+        res = run_one_subset(label, df)
+        if res is not None:
+            all_results.append(res)
+
+    if not all_results:
+        print("ERROR: 无有效检验结果，退出。")
+        return
+
+    generate_report(all_results, report_dir)
+
+
+def generate_report(all_results: List[Dict], report_dir: Path) -> None:
+    """生成 R14 格式检验报告。"""
+
+    report_path = report_dir / "R14_format_test_report.txt"
+
+    with open(report_path, "w", encoding="utf-8") as f:
+
+        f.write("=" * 80 + "\n")
+        f.write("格式偏好 Wilcoxon 符号秩检验报告\n")
+        f.write("=" * 80 + "\n\n")
+
+        f.write("【检验方法】\n")
+        f.write("  假设：H₀: median(Δ)=0  vs  H₁: median(Δ)>0（单侧）\n")
+        f.write("  Δᵢ = count_f(获胜模型) - count_f(落败模型)\n")
+        f.write("  排除 winner∈{tie, both_bad}\n")
+        f.write(f"  多重比较：子集内 Bonferroni（k={BONFERRONI_K} 个格式特征）\n")
+        f.write("  辅助：格式密度差值 Wilcoxon（Δ_density，不纳入校正）\n")
+        f.write("  效应量：rank-biserial r = 1 - 2W⁻/(n*(n+1))\n")
+        f.write(f"  Bootstrap CI：{N_BOOTSTRAP} 次重采样（百分位法，seed=42）\n\n")
+
+        f.write("【格式密度定义】\n")
+        f.write("  density = count_f / (tokens + 1)\n\n")
+
+        f.write("-" * 80 + "\n\n")
+
+        for res in all_results:
+            f.write(f"【{res['label']}】  有效配对数 = {res['n_pairs']:,}\n")
+            f.write("-" * 60 + "\n")
+
+            for fr in res["features"]:
+                feat_name = {"header": "标题", "list": "列表", "bold": "粗体"}[fr["feature"]]
+                sig_tag = "✓ 显著" if fr["significant"] else "✗ 不显著"
+                f.write(f"\n  [{feat_name}（{fr['feature']}）]  {sig_tag}\n")
+                f.write(f"    胜者格式更多比例    : {fr['pct_winner_more']}%"
+                        f"  ({fr['n_winner_more']:,} / {fr['n_pairs']:,})\n")
+                f.write(f"    中位计数差          : {fr['median_diff']:+.3f}"
+                        f"  [Bootstrap 95% CI: {fr['ci_low']:+.3f}, {fr['ci_high']:+.3f}]\n")
+                f.write(f"    Wilcoxon W          : {fr['wilcoxon_stat']:.1f}\n")
+                f.write(f"    p 值（原始）        : {fr['p_value']:.4e}\n")
+                f.write(f"    p 值（Bonferroni）  : {fr['p_bonferroni']:.4e}\n")
+                f.write(f"    rank-biserial r     : {fr['rank_biserial_r']:.4f}"
+                        f"  [{fr['effect_level']}效应]\n")
+                cd_str = f"{fr['cohen_d']:.4f}" if not np.isnan(fr['cohen_d']) else "N/A"
+                hg_str = f"{fr['hedges_g']:.4f}" if not np.isnan(fr['hedges_g']) else "N/A"
+                f.write(f"    Cohen's d / Hedges' g: {cd_str} / {hg_str}  （参数近似，仅供参考）\n")
+                f.write(f"    密度差中位数        : {fr['density_median_diff']:+.6f}\n")
+                den_str = (f"{fr['density_p_value']:.4e}"
+                           if fr["density_p_value"] is not None else "N/A")
+                f.write(f"    密度检验 p（辅助）  : {den_str}\n")
+                if fr["chisq_presence_p"] is not None:
+                    f.write(f"    卡方存在性 p        : {fr['chisq_presence_p']:.4e}\n")
+
+            f.write("\n")
+
+        # 汇总表
+        f.write("=" * 80 + "\n")
+        f.write("汇总（全部子集 × 全部特征，按 |r_rb| 倒序）\n")
+        f.write("=" * 80 + "\n")
+
+        rows = []
+        for res in all_results:
+            for fr in res["features"]:
+                rows.append({
+                    "子集":   res["label"],
+                    "特征":   fr["feature"],
+                    "n":      res["n_pairs"],
+                    "胜者%":  fr["pct_winner_more"],
+                    "中位差": fr["median_diff"],
+                    "p(adj)": fr["p_bonferroni"],
+                    "r_rb":   fr["rank_biserial_r"],
+                    "d":      fr["cohen_d"],
+                    "效应":   fr["effect_level"],
+                    "显著":   "✓" if fr["significant"] else "✗",
+                    "密度p":  fr["density_p_value"] if fr["density_p_value"] is not None else float("nan"),
+                })
+
+        rows_sorted = sorted(rows, key=lambda x: abs(x["r_rb"]), reverse=True)
+
+        hdr = (f"{'子集':<14} {'特征':<8} {'n':>8} {'胜者%':>8} "
+               f"{'中位差':>8} {'p(adj)':>12} {'r_rb':>8} {'d':>8} {'效应':>6} {'显著':>4} {'密度p':>12}")
+        f.write(hdr + "\n")
+        f.write("-" * len(hdr) + "\n")
+        for r in rows_sorted:
+            den_str = f"{r['密度p']:.4e}" if not np.isnan(r["密度p"]) else "N/A"
+            cd_str  = f"{r['d']:.4f}" if not np.isnan(r["d"]) else "N/A"
+            f.write(
+                f"{r['子集']:<14} {r['特征']:<8} {r['n']:>8,} "
+                f"{r['胜者%']:>7.1f}% {r['中位差']:>+8.3f} "
+                f"{r['p(adj)']:>12.4e} {r['r_rb']:>8.4f} "
+                f"{cd_str:>8} {r['效应']:>6} {r['显著']:>4} {den_str:>12}\n"
+            )
+
+        n_sig = sum(1 for r in rows if r["显著"] == "✓")
+        f.write(f"\n显著结果数：{n_sig} / {len(rows)}（Bonferroni 校正 k=3，α=0.05）\n\n")
+
+        f.write("=" * 80 + "\n")
+        f.write("报告生成时间: " + pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S") + "\n")
+        f.write("=" * 80 + "\n")
+
+    print(f"\n报告已保存至: {report_path}")
+
+
+if __name__ == "__main__":
+    print("=" * 80)
+    print("C17  格式偏好统计检验（Wilcoxon + 密度辅助 + 卡方存在性）")
+    print("=" * 80 + "\n")
+
+    run_format_test()
+
+    print("\n" + "=" * 80)
+    print("任务完成！")
+    print("=" * 80)

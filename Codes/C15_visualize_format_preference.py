@@ -39,12 +39,12 @@ def get_optimized_parquet_path(root: Path | str | None = None) -> Path:
     
     # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
     if root is None:
-        root = Path.cwd()
+        root_path = Path.cwd()
     else:
-        root = Path(root)
+        root_path = Path(root)
     
     # 优化数据文件位于项目根目录下的 Data/optimized_data/optimized_data.parquet
-    return root / "Data" / "optimized_data" / "optimized_data.parquet"
+    return root_path / "Data" / "optimized_data" / "optimized_data.parquet"
 
 
 def get_format_data_path(root: Path | str | None = None) -> Path:
@@ -54,11 +54,11 @@ def get_format_data_path(root: Path | str | None = None) -> Path:
     此路径用于存储预处理后的格式特征数据，可用于后续快速分析。
     """
     if root is None:
-        root = Path.cwd()
+        root_path = Path.cwd()
     else:
-        root = Path(root)
+        root_path = Path(root)
     
-    return root / "Data" / "format_data" / "format_data.parquet"
+    return root_path / "Data" / "format_data" / "format_data.parquet"
 
 
 
@@ -70,7 +70,7 @@ def extract_header_count(header_dict: dict | None) -> int:
     """
     从header_counts字典中提取标题总数。
     
-    参数：
+    参数说明：
     - header_dict：格式为 {'h1': count, 'h2': count, ..., 'h6': count} 的字典，
                    或为None（表示无标题数据）
     
@@ -90,7 +90,7 @@ def extract_list_count(list_dict: dict | None) -> int:
     """
     从list_counts字典中提取列表总数。
     
-    参数：
+    参数说明：
     - list_dict：格式为 {'ordered': count, 'unordered': count} 的字典，
                  或为None（表示无列表数据）
     
@@ -110,7 +110,7 @@ def extract_bold_count(bold_dict: dict | None) -> int:
     """
     从bold_counts字典中提取粗体总数。
     
-    参数：
+    参数说明：
     - bold_dict：格式为 {'**': count, '__': count} 的字典，
                  或为None（表示无粗体数据）
     
@@ -129,91 +129,85 @@ def extract_bold_count(bold_dict: dict | None) -> int:
 
 def prepare_format_data(df: pd.DataFrame) -> pd.DataFrame:
     """
-    从优化数据中提取和计算格式特征。
-    
-    本函数执行以下关键步骤：
-    1. 过滤掉平局评价（'tie' 或 'both_bad'）
-    2. 从嵌套的format_counts字典中提取三种格式特征（标题、列表、粗体）
-    3. 计算衍生特征：是否具有某种格式、格式总数
-    4. 对数据进行"解缠化"处理：将模型对比转换为单模型样本
-    
-    解缠化逻辑说明：
-    - 将每一行评价拆分为两个单模型样本（模型A和模型B）
-    - 每个样本记录该模型是否胜出（is_winner）
-    - 这样可以用单维度分析代替复杂的配对分析
-    
-    参数：
+    从优化数据中提取格式特征并执行解缠化处理，同时计算格式密度列。
+
+    格式密度 = 格式计数 / (输出 tokens + 1)，用于控制长度对格式计数的混淆影响。
+    +1 避免除零，且不影响非零情况下的数量级。
+
+    注：样本已解缠化，每对评价拆分为两条记录，配对数约为样本数的 1/2。
+
+    参数说明：
     - df：优化后的数据框，需包含以下列：
         - winner: 评价结果
-        - a_header_count, b_header_count: 两个模型的标题数（dict 格式）
-        - a_list_count, b_list_count: 两个模型的列表数（dict 格式）
-        - a_bold_count, b_bold_count: 两个模型的粗体数（dict 格式）
+        - a_header_count, b_header_count: 标题数（dict 格式）
+        - a_list_count, b_list_count: 列表数（dict 格式）
+        - a_bold_count, b_bold_count: 粗体数（dict 格式）
+        - a_tokens, b_tokens: 两模型输出 token 数
         - model_a, model_b: 两个模型的名称
-    
-    返回值：扩展后的数据框，包含格式特征和胜负标签
-    
+
+    返回值：扩展后的数据框，包含格式特征、密度特征和胜负标签
+
     异常处理：
-    - 若数据为空，返回空的DataFrame
-    - 若缺少必要列，会在运行时抛出KeyError
+    - 若数据为空，返回空的 DataFrame
+    - 若缺少必要列，会在运行时抛出 KeyError
     """
     print("准备格式特征数据...")
-    
+
     # 1. 过滤掉"平局"评价，保留有明确胜负的评价
     win_df = df[~df['winner'].isin(['tie', 'both_bad'])].copy()
     original_rows = len(df)
     valid_rows = len(win_df)
     print(f"  原始行数: {original_rows} 条评价")
     print(f"  过滤平局后: {valid_rows} 条有效评价 (过滤率: {(1 - valid_rows/original_rows):.1%})")
-    
-    # ========================================================================
-    # 第一阶段：提取模型A和模型B的格式特征（向量化计算）
-    # ========================================================================
-    # 使用 apply 批量提取，避免逐行 Python 循环（比 for+iloc 快 10~50 倍）
+
+    # 2. 提取格式计数（向量化，避免逐行 .iloc 循环）
     print("  提取格式特征...")
-    
-    # 注意：优化数据中列名无尾部 's'，即 a_header_count（而非 a_header_counts）
     a_header = win_df['a_header_count'].apply(extract_header_count)
     a_list   = win_df['a_list_count'].apply(extract_list_count)
     a_bold   = win_df['a_bold_count'].apply(extract_bold_count)
-    
+
     b_header = win_df['b_header_count'].apply(extract_header_count)
     b_list   = win_df['b_list_count'].apply(extract_list_count)
     b_bold   = win_df['b_bold_count'].apply(extract_bold_count)
-    
-    # ========================================================================
-    # 第二阶段：向量化构建模型A的样本数据
-    # ========================================================================
-    # 【向量化替代逐行循环的原因】：
-    # 原来使用 for idx in range(len(win_df)): ... win_df.iloc[idx] 方式，
-    # 每次 .iloc[idx] 都是一次标量索引，在 10 万行数据上极其缓慢。
-    # 改用 pd.DataFrame(dict_of_arrays) 一次性构建，速度提升显著。
+
+    # 3. 计算格式密度：count / (tokens + 1)，控制长度混淆
+    a_tokens = win_df['a_tokens'].values
+    b_tokens = win_df['b_tokens'].values
+
+    a_header_density = a_header.values / (a_tokens + 1)
+    a_list_density   = a_list.values   / (a_tokens + 1)
+    a_bold_density   = a_bold.values   / (a_tokens + 1)
+
+    b_header_density = b_header.values / (b_tokens + 1)
+    b_list_density   = b_list.values   / (b_tokens + 1)
+    b_bold_density   = b_bold.values   / (b_tokens + 1)
+
+    # 4. 解缠化：构建模型 A 样本
     a_has_header = (a_header > 0)
     a_has_list   = (a_list   > 0)
     a_has_bold   = (a_bold   > 0)
-    
+
     a_df = pd.DataFrame({
         'header_count': a_header.values,
         'list_count':   a_list.values,
         'bold_count':   a_bold.values,
-        # 二值特征：用于后续「有格式 vs 无格式」的二分类分析
         'has_header': a_has_header.values,
         'has_list':   a_has_list.values,
         'has_bold':   a_has_bold.values,
-        # 三种格式中只要有一种即视为「有格式」
         'has_format': (a_has_header | a_has_list | a_has_bold).values,
-        # 格式总数：用于分析总体格式使用量与胜率的关系
         'total_format': (a_header + a_list + a_bold).values,
+        'header_density': a_header_density,
+        'list_density':   a_list_density,
+        'bold_density':   a_bold_density,
         'is_winner': (win_df['winner'].values == 'model_a'),
         'model': win_df['model_a'].values
     })
-    
-    # ========================================================================
-    # 第三阶段：向量化构建模型B的样本数据（逻辑与A完全对称）
-    # ========================================================================
+
+    # 5. 解缠化：构建模型 B 样本（逻辑与 A 完全对称）
     b_has_header = (b_header > 0)
     b_has_list   = (b_list   > 0)
     b_has_bold   = (b_bold   > 0)
-    
+
     b_df = pd.DataFrame({
         'header_count': b_header.values,
         'list_count':   b_list.values,
@@ -223,21 +217,72 @@ def prepare_format_data(df: pd.DataFrame) -> pd.DataFrame:
         'has_bold':   b_has_bold.values,
         'has_format': (b_has_header | b_has_list | b_has_bold).values,
         'total_format': (b_header + b_list + b_bold).values,
+        'header_density': b_header_density,
+        'list_density':   b_list_density,
+        'bold_density':   b_bold_density,
         'is_winner': (win_df['winner'].values == 'model_b'),
         'model': win_df['model_b'].values
     })
-    
-    # ========================================================================
-    # 第四阶段：合并两个模型的数据，完成解缠化
-    # ========================================================================
-    # pd.concat 比手工 append 循环更高效，ignore_index 保证索引连续
+
+    # 6. 合并两个子集，完成解缠化
     format_data = pd.concat([a_df, b_df], ignore_index=True)
-    
     print(f"  解缠化后总样本数: {len(format_data)} 个模型回答")
-    print("=" * 80)
-    
+
     return format_data
 
+
+
+def analyze_format_density(format_data: pd.DataFrame,
+                           n_bins: int = 20) -> Dict[str, pd.DataFrame]:
+    """
+    对三种格式密度特征分别进行分箱分析，输出密度–胜率关系。
+
+    格式密度已在 prepare_format_data 中计算：density = count / (tokens + 1)。
+    本函数将各密度列分成 n_bins 个等宽区间（1%–99% 范围），计算各箱胜率。
+
+    参数说明：
+    - format_data：包含 header_density / list_density / bold_density / is_winner 列的数据框
+    - n_bins：分箱数量（默认 20）
+
+    返回值：字典 {'header': df, 'list': df, 'bold': df}，每个 df 包含
+      - bin_center, win_rate, sample_count, sample_proportion
+    """
+    print("分析格式密度特征...")
+    density_stats: Dict[str, pd.DataFrame] = {}
+
+    for feat in ['header', 'list', 'bold']:
+        col = f'{feat}_density'
+        series = format_data[col]
+
+        lower = series.quantile(0.01)
+        upper = series.quantile(0.99)
+
+        # 若上下界几乎相等（特征基本为零），跳过该特征
+        if upper - lower < 1e-9:
+            print(f"  {col}: 范围过小，跳过分箱")
+            density_stats[feat] = pd.DataFrame(
+                columns=['bin_center', 'win_rate', 'sample_count', 'sample_proportion'])
+            continue
+
+        bins = np.linspace(lower, upper, n_bins + 1)
+        fd = format_data.copy()
+        fd['_bin'] = pd.cut(fd[col], bins=bins, include_lowest=True)
+
+        stats = fd.groupby('_bin').agg(
+            win_rate=('is_winner', 'mean'),
+            sample_count=('is_winner', 'count'),
+            bin_center=(col, 'mean')
+        ).reset_index(drop=True)
+
+        total = stats['sample_count'].sum()
+        stats['sample_proportion'] = stats['sample_count'] / total
+        density_stats[feat] = stats
+
+        best_idx = stats['win_rate'].idxmax()
+        print(f"  {col}: 最优密度中心值={stats.loc[best_idx, 'bin_center']:.4f}  "
+              f"胜率={stats.loc[best_idx, 'win_rate']:.3f}")
+
+    return density_stats
 
 
 def analyze_format_presence(format_data: pd.DataFrame) -> pd.DataFrame:
@@ -257,7 +302,7 @@ def analyze_format_presence(format_data: pd.DataFrame) -> pd.DataFrame:
     - without_format_win_rate: 无该格式时的胜率
     - win_rate_diff: 两者之差（正值表示有该格式时表现更好）
     
-    参数：
+    参数说明：
     - format_data：包含格式特征和is_winner列的数据框
     
     返回值：统计数据框，包含上述指标
@@ -316,7 +361,7 @@ def analyze_count_feature(format_data: pd.DataFrame,
     3. 过滤掉样本量过少的分组（通常由异常值引起）
     4. 找到胜率最高的分组作为"最优值"
     
-    参数：
+    参数说明：
     - format_data：包含格式特征列的数据框
     - feature_name：要分析的列名（如'header_count'、'list_count'、'bold_count'）
     - min_sample_count：样本数量阈值，低于此值的分组会被过滤（默认200）
@@ -442,7 +487,7 @@ def analyze_format_combinations(format_data: pd.DataFrame) -> pd.DataFrame:
     
     这8种组合涵盖了所有可能的情况（2^3 = 8），且彼此互不重叠。
     
-    参数：
+    参数说明：
     - format_data：包含has_header、has_list、has_bold列的数据框
     
     返回值：统计数据框，按胜率从高到低排序
@@ -552,7 +597,7 @@ def plot_presence_bar_chart(presence_df: pd.DataFrame,
     - 并列条形设计：直观对比两种情况的胜率差异
     - 颜色编码：便于区分（与C14保持一致）
     
-    参数：
+    参数说明：
     - presence_df：格式存在性分析的统计数据框
     - output_dir：输出目录（默认为Pictures）
     
@@ -674,7 +719,7 @@ def plot_count_feature_line_chart(count_stats: pd.DataFrame,
       * 样本少的位置: 结果可能由于样本不足而波动
     - 趋势线：反映整体的二阶非线性关系
     
-    参数：
+    参数说明：
     - count_stats：计数特征分组后的统计数据框
     - feature_name：特征名称（如'header_count'、'list_count'、'bold_count'）
     - best_count：最优的特征值
@@ -904,7 +949,7 @@ def plot_combination_bar_chart(combination_stats: pd.DataFrame,
     - 样本数标注：提醒用户某些组合可能样本不足
     - 排序设计：从高到低排序，便于识别"最佳实践"
     
-    参数：
+    参数说明：
     - combination_stats：格式组合分析的统计数据框
     - output_dir：输出目录（默认为Pictures）
     
@@ -1011,7 +1056,7 @@ def create_summary_tables(format_data: pd.DataFrame,
     - T08_format_combination_analysis.csv：格式组合分析
       * 各种格式组合的胜率排名
     
-    参数：
+    参数说明：
     - format_data：基础格式数据（用于计算基本统计）
     - presence_df：格式存在性分析结果
     - header_stats：标题数分析结果
@@ -1093,435 +1138,238 @@ def create_summary_tables(format_data: pd.DataFrame,
 
 
 
-def generate_analysis_report(format_data: pd.DataFrame, 
-                            presence_df: pd.DataFrame,
-                            header_stats: pd.DataFrame, 
-                            list_stats: pd.DataFrame, 
-                            bold_stats: pd.DataFrame,
-                            combination_stats: pd.DataFrame,
-                            best_header_count: float,
-                            best_header_win_rate: float, 
-                            best_list_count: float,
-                            best_list_win_rate: float, 
-                            best_bold_count: float,
-                            best_bold_win_rate: float,
-                            output_dir: Path | str | None = None) -> Path:
+def generate_analysis_report(format_data: pd.DataFrame,
+                             presence_df: pd.DataFrame,
+                             header_stats: pd.DataFrame,
+                             list_stats: pd.DataFrame,
+                             bold_stats: pd.DataFrame,
+                             combination_stats: pd.DataFrame,
+                             best_header_count: float,
+                             best_header_win_rate: float,
+                             best_list_count: float,
+                             best_list_win_rate: float,
+                             best_bold_count: float,
+                             best_bold_win_rate: float,
+                             density_stats: Dict[str, pd.DataFrame] | None = None,
+                             output_dir: Path | str | None = None,
+                             mode: str = "w",
+                             section_tag: str = "全量数据") -> Path:
     """
-    生成格式偏好分析的完整报告。
-    
-    本函数将所有分析结果汇总成一份文本报告，包括：
-    - 分析概况：数据规模、基本统计
-    - 格式存在性分析：有/无各种格式的胜率对比
-    - 计数特征分析：不同个数的格式对胜率的影响
-    - 格式组合分析：最优的格式搭配方式
-    - 主要发现和建议：对AI输出格式的优化建议
-    
-    报告结构类似C14的报告，分为6个主要部分，便于阅读和理解。
-    
-    参数：
+    生成格式偏好分析的完整报告，支持以追加模式写入子集结论。
+
+    参数说明：
     - format_data：基础格式数据（用于计算总样本数）
     - presence_df：格式存在性分析结果
-    - header_stats：标题数分析结果
-    - list_stats：列表数分析结果
-    - bold_stats：粗体数分析结果
+    - header_stats / list_stats / bold_stats：各计数特征分析结果
     - combination_stats：格式组合分析结果
-    - best_header_count等：各维度的最优值和胜率
-    - output_dir：输出目录（默认为Reports）
-    
+    - best_*_count / best_*_win_rate：各维度的最优值和胜率
+    - density_stats：格式密度分箱统计（dict，key 为 'header'/'list'/'bold'；可为 None）
+    - output_dir：输出目录（默认为 Reports）
+    - mode：文件写入模式，'w' 为覆写，'a' 为追加（默认 'w'）
+    - section_tag：当前分析集名称，用于报告标题区分（默认"全量数据"）
+
     返回值：保存的报告文件路径
     """
-    print("生成分析报告...")
-    
-    # 参数标准化：支持Path或str，默认使用Reports目录
+    print(f"生成分析报告（{section_tag}）...")
+
     if output_dir is None:
         output_dir = Path.cwd() / "Reports"
     else:
         output_dir = Path(output_dir)
-    
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     report_path = output_dir / "R12_format_preference_report.txt"
-    
-    # ========================================================================
-    # 开始写入报告
-    # ========================================================================
-    with open(report_path, 'w', encoding='utf-8') as f:
-        # 报告头部
+
+    with open(report_path, mode, encoding='utf-8') as f:
+
+        # 1. 分析概况
         f.write("=" * 80 + "\n")
-        f.write("格式偏好分析报告\n")
+        f.write(f"格式偏好分析报告 — {section_tag}\n")
         f.write("=" * 80 + "\n\n")
-        
-        # ====================================================================
-        # 第一部分：分析概况
-        # ====================================================================
+
         f.write("1. 分析概况\n")
-        f.write("-" * 40 + "\n")
-        f.write(f"分析时间: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        f.write(f"总样本数: {len(format_data):,} 个模型回答\n")
-        f.write(f"有任何格式的样本占比: {format_data['has_format'].mean():.2%}\n")
-        f.write(f"\n格式使用情况统计:\n")
-        f.write(f"  - 平均格式总数: {format_data['total_format'].mean():.2f} 个\n")
-        f.write(f"  - 平均标题数: {format_data['header_count'].mean():.2f} 个\n")
-        f.write(f"  - 平均列表数: {format_data['list_count'].mean():.2f} 个\n")
-        f.write(f"  - 平均粗体数: {format_data['bold_count'].mean():.2f} 个\n")
-        f.write(f"  - 有标题的样本占比: {format_data['has_header'].mean():.2%}\n")
-        f.write(f"  - 有列表的样本占比: {format_data['has_list'].mean():.2%}\n")
-        f.write(f"  - 有粗体的样本占比: {format_data['has_bold'].mean():.2%}\n")
-        f.write("\n")
-        
-        # ====================================================================
-        # 第二部分：格式存在性分析
-        # ====================================================================
+        f.write(f"   分析时间: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write(f"   总样本数（解缠化后）: {len(format_data):,}\n")
+        f.write(f"   对应原始配对数（约）: {len(format_data) // 2:,}\n")
+        f.write("   注：样本已解缠化，每对评价拆分为两条记录，配对数约为样本数的 1/2。\n")
+        f.write(f"   有任何格式的样本占比: {format_data['has_format'].mean():.2%}\n")
+        f.write(f"   有标题: {format_data['has_header'].mean():.2%}  "
+                f"有列表: {format_data['has_list'].mean():.2%}  "
+                f"有粗体: {format_data['has_bold'].mean():.2%}\n\n")
+
+        # 2. 格式存在性分析
         f.write("2. 格式存在性分析\n")
-        f.write("-" * 40 + "\n")
-        f.write("说明：该部分分析有/无各种格式时的胜率差异，用于判断格式是否有帮助。\n\n")
-        
         for _, row in presence_df.iterrows():
-            f.write(f"{row['format_type']}:\n")
-            f.write(f"  - 有该格式时的胜率: {row['with_format_win_rate']:.3f} "
-                   f"(n={int(row['with_format_count'])})\n")
-            f.write(f"  - 无该格式时的胜率: {row['without_format_win_rate']:.3f} "
-                   f"(n={int(row['without_format_count'])})\n")
-            f.write(f"  - 胜率差异: {row['win_rate_diff']:+.3f} ")
-            
-            # 给出解释性文字
-            if row['win_rate_diff'] > 0.01:
-                f.write("(有该格式时显著更优)\n")
-            elif row['win_rate_diff'] < -0.01:
-                f.write("(无该格式时显著更优)\n")
+            diff_label = ("有该格式时显著更优" if row['win_rate_diff'] > 0.01
+                          else "无该格式时显著更优" if row['win_rate_diff'] < -0.01
+                          else "影响不显著")
+            f.write(f"   {row['format_type']}: "
+                    f"有={row['with_format_win_rate']:.3f} (n={int(row['with_format_count'])})  "
+                    f"无={row['without_format_win_rate']:.3f} (n={int(row['without_format_count'])})  "
+                    f"差={row['win_rate_diff']:+.3f}  [{diff_label}]\n")
+        f.write("\n")
+
+        # 3. 计数特征分析
+        f.write("3. 计数特征最优值\n")
+        for name, best_c, best_wr in [
+            ("header_count", best_header_count, best_header_win_rate),
+            ("list_count",   best_list_count,   best_list_win_rate),
+            ("bold_count",   best_bold_count,   best_bold_win_rate),
+        ]:
+            if best_c is not None:
+                f.write(f"   最优 {name}: {int(best_c)}  胜率: {best_wr:.3f}\n")
             else:
-                f.write("(影响不显著)\n")
-            f.write("\n")
-        
-        # ====================================================================
-        # 第三部分：标题数分析
-        # ====================================================================
-        f.write("3. 标题数分析（header_count）\n")
-        f.write("-" * 40 + "\n")
-        if best_header_count is not None:
-            f.write(f"最优标题数: {best_header_count}\n")
-            f.write(f"对应胜率: {best_header_win_rate:.3f}\n")
-            f.write(f"分析分组数: {len(header_stats)}\n\n")
-            f.write("标题数与胜率关系:\n")
-            for idx, row in header_stats.iterrows():
-                f.write(f"  {int(row['header_count'])} 个标题: "
-                       f"win_rate={row['win_rate']:.3f}, "
-                       f"样本数={int(row['sample_count'])}, "
-                       f"占比={row['sample_proportion']:.2%}\n")
+                f.write(f"   {name}: 数据不足\n")
+        f.write("\n")
+
+        # 4. 格式密度分析
+        f.write("4. 格式密度分析\n")
+        f.write("   注：格式计数效应可能含长度混淆，详见 R14 格式密度辅助检验。\n")
+        if density_stats:
+            for feat in ['header', 'list', 'bold']:
+                stats = density_stats.get(feat, pd.DataFrame())
+                if stats.empty:
+                    f.write(f"   {feat}_density: 数据不足\n")
+                    continue
+                best_idx = stats['win_rate'].idxmax()
+                f.write(f"   {feat}_density 最优中心值: "
+                        f"{stats.loc[best_idx, 'bin_center']:.4f}  "
+                        f"胜率: {stats.loc[best_idx, 'win_rate']:.3f}  "
+                        f"(n={int(stats.loc[best_idx, 'sample_count'])})\n")
         else:
-            f.write("数据不足，无法进行分析\n")
+            f.write("   （本次未计算密度统计）\n")
         f.write("\n")
-        
-        # ====================================================================
-        # 第四部分：列表数分析
-        # ====================================================================
-        f.write("4. 列表数分析（list_count）\n")
-        f.write("-" * 40 + "\n")
-        if best_list_count is not None:
-            f.write(f"最优列表数: {best_list_count}\n")
-            f.write(f"对应胜率: {best_list_win_rate:.3f}\n")
-            f.write(f"分析分组数: {len(list_stats)}\n\n")
-            f.write("列表数与胜率关系:\n")
-            for idx, row in list_stats.iterrows():
-                f.write(f"  {int(row['list_count'])} 个列表: "
-                       f"win_rate={row['win_rate']:.3f}, "
-                       f"样本数={int(row['sample_count'])}, "
-                       f"占比={row['sample_proportion']:.2%}\n")
-        else:
-            f.write("数据不足，无法进行分析\n")
+
+        # 5. 格式组合分析
+        f.write("5. 格式组合排名（Top-5）\n")
+        top5 = combination_stats.head(5)
+        for rank, (_, row) in enumerate(top5.iterrows(), 1):
+            f.write(f"   {rank}. {row['format_combination']:30s}  "
+                    f"胜率: {row['win_rate']:.3f}  "
+                    f"n={int(row['sample_count'])} ({row['sample_proportion']:.1%})\n")
         f.write("\n")
-        
-        # ====================================================================
-        # 第五部分：粗体数分析
-        # ====================================================================
-        f.write("5. 粗体数分析（bold_count）\n")
-        f.write("-" * 40 + "\n")
-        if best_bold_count is not None:
-            f.write(f"最优粗体数: {best_bold_count}\n")
-            f.write(f"对应胜率: {best_bold_win_rate:.3f}\n")
-            f.write(f"分析分组数: {len(bold_stats)}\n\n")
-            f.write("粗体数与胜率关系:\n")
-            for idx, row in bold_stats.iterrows():
-                f.write(f"  {int(row['bold_count'])} 个粗体: "
-                       f"win_rate={row['win_rate']:.3f}, "
-                       f"样本数={int(row['sample_count'])}, "
-                       f"占比={row['sample_proportion']:.2%}\n")
-        else:
-            f.write("数据不足，无法进行分析\n")
-        f.write("\n")
-        
-        # ====================================================================
-        # 第六部分：格式组合分析
-        # ====================================================================
-        f.write("6. 格式组合分析\n")
-        f.write("-" * 40 + "\n")
-        f.write(f"分析分组数: {len(combination_stats)}\n")
-        f.write("格式组合的胜率排名（从高到低）:\n\n")
-        # 使用 enumerate 获得连续的排名序号（combination_stats 已按 win_rate 降序排列）
-        for rank, (_, row) in enumerate(combination_stats.iterrows(), 1):
-            f.write(f"  {rank}. {row['format_combination']:30s}: {row['win_rate']:.3f} ")
-            f.write(f"(n={int(row['sample_count'])}, {row['sample_proportion']:.1%})\n")
-        f.write("\n")
-        
-        # ====================================================================
-        # 第七部分：主要发现和建议
-        # ====================================================================
-        f.write("7. 主要发现和建议\n")
-        f.write("-" * 40 + "\n")
-        
-        # 发现1：最优格式组合
-        if len(combination_stats) > 0:
-            best_combo = combination_stats.iloc[0]
-            f.write(f"• 最佳格式组合：{best_combo['format_combination']} "
-                   f"(win_rate: {best_combo['win_rate']:.3f})\n")
-        
-        # 发现2：标题的影响
-        if best_header_count is not None:
-            f.write(f"• 标题优化建议：最优使用 {int(best_header_count)} 个标题\n")
-        
-        # 发现3：列表的影响
-        if best_list_count is not None:
-            f.write(f"• 列表优化建议：最优使用 {int(best_list_count)} 个列表\n")
-        
-        # 发现4：粗体的影响
-        if best_bold_count is not None:
-            f.write(f"• 粗体优化建议：最优使用 {int(best_bold_count)} 个粗体标记\n")
-        
-        # 发现5：格式存在性的影响
-        f.write("\n• 格式存在性影响:\n")
-        for _, row in presence_df.iterrows():
-            if row['win_rate_diff'] > 0.01:
-                f.write(f"  - {row['format_type']}: 使用该格式可提升胜率约 {row['win_rate_diff']:.1%}\n")
-        
-        f.write("\n")
-        f.write("=" * 80 + "\n")
-        f.write("报告结束\n")
-        f.write("=" * 80 + "\n")
-    
-    print(f"  已保存至: {report_path}")
-    print("=" * 80)
-    
+
+    print(f"  分析报告写入: {report_path}")
     return report_path
 
 
 
 if __name__ == "__main__":
-    """
-    主函数：协调所有分析模块，完整执行格式偏好分析流程。
-    
-    执行步骤：
-    1. 初始化和环境检查
-    2. 数据加载和验证
-    3. 格式特征提取和准备
-    4. 四个独立的分析模块（存在性、计数、组合）
-    5. 可视化图表生成
-    6. 统计报告生成
-    7. 最终总结
-    """
-    
     print("=" * 80)
     print("格式偏好可视化分析")
     print("=" * 80)
-    print()
-    
-    # ========================================================================
-    # 第一步：初始化路径和参数
-    # ========================================================================
-    print("【初始化环节】")
-    
-    # 确定输入数据文件路径（支持自定义）
+
+    # 1. 初始化路径
     data_file_path = get_optimized_parquet_path()
-    print(f"输入数据文件：{data_file_path}")
-    
-    # 输出目录设置
-    charts_dir = Path.cwd() / "Pictures"
+    charts_dir  = Path.cwd() / "Pictures"
     reports_dir = Path.cwd() / "Reports"
-    tables_dir = Path.cwd() / "Tables"
-    
-    print(f"图表输出目录：{charts_dir}")
-    print(f"报告输出目录：{reports_dir}")
-    print(f"表格输出目录：{tables_dir}")
-    print()
-    
-    # ========================================================================
-    # 第二步：数据加载和验证
-    # ========================================================================
-    print("【数据加载阶段】")
-    
+    tables_dir  = Path.cwd() / "Tables"
+    for d in (charts_dir, reports_dir, tables_dir):
+        d.mkdir(parents=True, exist_ok=True)
+
+    # 2. 加载数据
     # 检查输入文件是否存在
     if not data_file_path.exists():
         print(f"ERROR: 输入文件不存在 - {data_file_path}")
         print("请确保已运行 C12_optimize_data.py 生成优化数据")
         exit(1)
-    
-    # 尝试加载数据
+
     try:
         df = pd.read_parquet(data_file_path)
-        print(f"✓ 数据加载成功")
-        print(f"  - 数据形状: {df.shape[0]:,} 行 × {df.shape[1]} 列")
-        print(f"  - 列名: {', '.join(df.columns[:5])}...")
+        print(f"  数据加载成功，形状: {df.shape[0]:,} × {df.shape[1]}")
     except Exception as exc:
         print(f"ERROR: 数据加载失败 - {exc}")
         exit(1)
-    
-    print()
-    
-    # ========================================================================
-    # 第三步：提取格式特征
-    # ========================================================================
-    print("【特征提取阶段】")
-    
+
+    # 1. 全量分析
+    print("\n" + "-" * 40)
+    print("1. 全量数据分析")
+    print("-" * 40)
+
+    format_data = prepare_format_data(df)
+
+    # 1.1 缓存解缠化结果
+    format_data_path = get_format_data_path()
+    format_data_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        format_data = prepare_format_data(df)
-        
-        # 缓存处理后的格式数据（便于后续快速迭代分析）
-        format_data_path = get_format_data_path()
-        format_data_path.parent.mkdir(parents=True, exist_ok=True)
         format_data.to_parquet(format_data_path, index=False)
-        print(f"✓ 格式数据已缓存至：{format_data_path}")
-        
-    except Exception as exc:
-        print(f"ERROR: 特征提取失败 - {exc}")
-        exit(1)
-    
-    print()
-    
-    # ========================================================================
-    # 第四步：执行四个分析模块
-    # ========================================================================
-    print("【分析阶段】")
-    
-    try:
-        # 模块1：格式存在性分析
-        presence_df = analyze_format_presence(format_data)
-        
-        # 模块2：格式计数分析（三维度：标题、列表、粗体）
-        header_stats, best_header_count, best_header_win_rate = analyze_header_count(format_data)
-        list_stats, best_list_count, best_list_win_rate = analyze_list_count(format_data)
-        bold_stats, best_bold_count, best_bold_win_rate = analyze_bold_count(format_data)
-        
-        # 模块3：格式组合分析
-        combination_stats = analyze_format_combinations(format_data)
-        
-    except Exception as exc:
-        print(f"ERROR: 分析失败 - {exc}")
-        exit(1)
-    
-    print()
-    
-    # ========================================================================
-    # 第五步：生成可视化图表
-    # ========================================================================
-    print("【可视化阶段】")
-    
-    try:
-        # 图表1：格式存在性条形图
-        plot_presence_bar_chart(presence_df, charts_dir)
-        
-        # 图表2-4：计数特征折线图
-        # 注意：当全部分组被过滤时 best_* 可能为 None，
-        # plot_count_feature_line_chart 内部已处理该边界情况
-        plot_header_count_line_chart(header_stats, best_header_count, 
-                                    best_header_win_rate, charts_dir)
-        plot_list_count_line_chart(list_stats, best_list_count, 
-                                  best_list_win_rate, charts_dir)
-        plot_bold_count_line_chart(bold_stats, best_bold_count, 
-                                  best_bold_win_rate, charts_dir)
-        
-        # 图表5：格式组合条形图
-        plot_combination_bar_chart(combination_stats, charts_dir)
-        
-        print("✓ 所有图表已生成")
-        
-    except Exception as exc:
-        print(f"ERROR: 图表生成失败 - {exc}")
-        exit(1)
-    
-    print()
-    
-    # ========================================================================
-    # 第六步：创建统计表格
-    # ========================================================================
-    print("【数据导出阶段】")
-    
-    try:
-        create_summary_tables(format_data, presence_df, header_stats, 
-                            list_stats, bold_stats, combination_stats, 
-                            tables_dir)
-        print("✓ 统计表格已生成")
-        
-    except Exception as exc:
-        print(f"ERROR: 表格生成失败 - {exc}")
-        exit(1)
-    
-    print()
-    
-    # ========================================================================
-    # 第七步：生成分析报告
-    # ========================================================================
-    print("【报告生成阶段】")
-    
-    try:
-        generate_analysis_report(format_data, presence_df,
-                                header_stats, list_stats, bold_stats, 
-                                combination_stats,
-                                best_header_count, best_header_win_rate,
-                                best_list_count, best_list_win_rate,
-                                best_bold_count, best_bold_win_rate,
-                                reports_dir)
-        print("✓ 分析报告已生成")
-        
-    except Exception as exc:
-        print(f"ERROR: 报告生成失败 - {exc}")
-        exit(1)
-    
-    print()
-    
-    # ========================================================================
-    # 第八步：最终总结
-    # ========================================================================
-    print("=" * 80)
-    print("分析完成！")
-    print("=" * 80)
-    print()
-    
-    print("【输出文件清单】")
-    print()
-    print("图表文件（Pictures目录）:")
-    print(f"  1. P06_format_presence_bar_chart.png")
-    print(f"  2. P07_header_count_line_chart.png")
-    print(f"  3. P08_list_count_line_chart.png")
-    print(f"  4. P09_bold_count_line_chart.png")
-    print(f"  5. P10_format_combination_bar_chart.png")
-    print()
-    
-    print("统计表格（Tables目录）:")
-    print(f"  1. T03_basic_statistics.csv")
-    print(f"  2. T04_format_presence_analysis.csv")
-    print(f"  3. T05_header_count_analysis.csv")
-    print(f"  4. T06_list_count_analysis.csv")
-    print(f"  5. T07_bold_count_analysis.csv")
-    print(f"  6. T08_format_combination_analysis.csv")
-    print()
-    
-    print("分析报告（Reports目录）:")
-    print(f"  1. R12_format_preference_report.txt")
-    print()
-    
-    print("【关键发现】")
-    if len(combination_stats) > 0:
-        best_combo = combination_stats.iloc[0]
-        print(f"  • 最佳格式组合：{best_combo['format_combination']}")
-        print(f"    胜率：{best_combo['win_rate']:.1%}")
-    
-    if best_header_count is not None:
-        print(f"  • 最优标题数：{int(best_header_count)} 个（胜率：{best_header_win_rate:.1%}）")
-    
-    if best_list_count is not None:
-        print(f"  • 最优列表数：{int(best_list_count)} 个（胜率：{best_list_win_rate:.1%}）")
-    
-    if best_bold_count is not None:
-        print(f"  • 最优粗体数：{int(best_bold_count)} 个（胜率：{best_bold_win_rate:.1%}）")
-    
-    print()
+        print(f"  格式数据缓存已保存: {format_data_path}")
+    except Exception as e:
+        print(f"  WARNING: 缓存保存失败 - {e}")
+
+    # 1.2 存在性分析
+    presence_df = analyze_format_presence(format_data)
+
+    # 1.3 计数特征分析
+    header_stats, best_header_count, best_header_win_rate = analyze_header_count(format_data)
+    list_stats, best_list_count, best_list_win_rate = analyze_list_count(format_data)
+    bold_stats, best_bold_count, best_bold_win_rate = analyze_bold_count(format_data)
+
+    # 1.4 组合分析
+    combination_stats = analyze_format_combinations(format_data)
+
+    # 1.5 密度分析
+    density_stats = analyze_format_density(format_data)
+
+    # 1.6 可视化
+    plot_presence_bar_chart(presence_df, charts_dir)
+    plot_header_count_line_chart(header_stats, best_header_count, best_header_win_rate, charts_dir)
+    plot_list_count_line_chart(list_stats, best_list_count, best_list_win_rate, charts_dir)
+    plot_bold_count_line_chart(bold_stats, best_bold_count, best_bold_win_rate, charts_dir)
+    plot_combination_bar_chart(combination_stats, charts_dir)
+
+    # 1.7 统计表格
+    create_summary_tables(format_data, presence_df, header_stats,
+                          list_stats, bold_stats, combination_stats, tables_dir)
+
+    # 1.8 报告（首次写入，覆写模式）
+    generate_analysis_report(
+        format_data, presence_df, header_stats, list_stats, bold_stats,
+        combination_stats, best_header_count, best_header_win_rate,
+        best_list_count, best_list_win_rate, best_bold_count, best_bold_win_rate,
+        density_stats=density_stats, output_dir=reports_dir,
+        mode="w", section_tag="全量数据"
+    )
+
+    # 2. 分层子集分析（仅存在性 + 密度，计数特征因样本量有限仅供参考）
+    subset_configs = [
+        ("creative_writing_true_data.parquet", "CW（创意写作）"),
+        ("if_true_data.parquet",              "IF（指令跟随）"),
+        ("math_true_data.parquet",            "MATH（数学）"),
+        ("code_true_data.parquet",            "CODE（代码）"),
+    ]
+    subset_dir = Path.cwd() / "Data" / "optimized_data"
+
+    for filename, tag in subset_configs:
+        subset_path = subset_dir / filename
+        if not subset_path.exists():
+            print(f"\n  WARNING: 子集文件不存在，跳过 {filename}")
+            continue
+
+        print(f"\n{'-' * 40}")
+        print(f"2. 分层分析 — {tag}")
+        print(f"{'-' * 40}")
+
+        df_sub = pd.read_parquet(subset_path)
+        print(f"  子集形状: {df_sub.shape}")
+
+        format_data_sub = prepare_format_data(df_sub)
+        presence_sub = analyze_format_presence(format_data_sub)
+        header_sub, best_h_sub, best_h_wr_sub = analyze_header_count(format_data_sub)
+        list_sub,   best_l_sub, best_l_wr_sub = analyze_list_count(format_data_sub)
+        bold_sub,   best_b_sub, best_b_wr_sub = analyze_bold_count(format_data_sub)
+        combo_sub = analyze_format_combinations(format_data_sub)
+        density_sub = analyze_format_density(format_data_sub)
+
+        # 追加写入同一报告
+        generate_analysis_report(
+            format_data_sub, presence_sub, header_sub, list_sub, bold_sub,
+            combo_sub, best_h_sub, best_h_wr_sub,
+            best_l_sub, best_l_wr_sub, best_b_sub, best_b_wr_sub,
+            density_stats=density_sub, output_dir=reports_dir,
+            mode="a", section_tag=tag
+        )
+
+    print("\n" + "=" * 80)
+    print("任务完成！")
     print("=" * 80)
