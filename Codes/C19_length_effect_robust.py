@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Robust length effect analysis using direct longer-wins labels, logistic regression, and propensity score matching.
-输出：Reports/R14_length_effect_robust_report.txt
+输出：Reports/R17_length_effect_robust_report.txt
 """
 
 import os
@@ -304,7 +304,7 @@ def render_report():
             report_lines.append(f'    IPW effect: {ipw_res["ipw_effect"]:.4f}')
         report_lines.append('')
 
-    out_path = Path(root) / 'Reports' / 'R14_length_effect_robust_report.txt'
+    out_path = Path(root) / 'Reports' / 'R17_length_effect_robust_report.txt'
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(report_lines))

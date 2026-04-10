@@ -2,7 +2,7 @@
 """
 Enhanced length effect analysis with ability/difficulty proxies and matching diagnostics.
 增加能力指标和匹配质量诊断。
-输出：Reports/R15_enhanced_diagnostics_report.txt / R15_matching_diagnostics.csv / R15_ability_proxies.csv
+输出：Reports/R18_enhanced_diagnostics_report.txt / R18_matching_diagnostics.csv / R18_ability_proxies.csv
 """
 
 import os
@@ -428,15 +428,15 @@ def main():
     
     print('Rendering main enhanced analysis report...')
     main_report = render_main_report()
-    with open(output_dir / 'R15_enhanced_diagnostics_report.txt', 'w', encoding='utf-8') as f:
+    with open(output_dir / 'R18_enhanced_diagnostics_report.txt', 'w', encoding='utf-8') as f:
         f.write(main_report)
-    print(f'  Saved: Reports/R15_enhanced_diagnostics_report.txt')
+    print(f'  Saved: Reports/R18_enhanced_diagnostics_report.txt')
     
     print('Rendering ability proxy summary...')
     proxy_summary = render_ability_proxy_summary()
-    with open(output_dir / 'R15_ability_proxies.txt', 'w', encoding='utf-8') as f:
+    with open(output_dir / 'R18_ability_proxies.txt', 'w', encoding='utf-8') as f:
         f.write(proxy_summary)
-    print(f'  Saved: Reports/R15_ability_proxies.txt')
+    print(f'  Saved: Reports/R18_ability_proxies.txt')
     
     print('Done. All reports saved to Reports/ folder.')
 
