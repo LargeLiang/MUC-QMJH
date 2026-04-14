@@ -1,8 +1,8 @@
 # MUC-QMJH 数据分析项目总结报告
 
-**项目版本**: v1.2  
-**更新时间**: 2026-04-07  
-**状态**: 进行中（描述性分析完毕，统计检验阶段）
+**项目版本**: v1.3  
+**更新时间**: 2026-04-10  
+**状态**: 净效应分析完成（C18/R16）；稳健性检验阶段
 
 ---
 
@@ -55,14 +55,13 @@
 | C11 | touch_category_tag | 分析分类标签 | R08_category_tag_report.txt |
 | C12 | optimize_data | 数据清洗和优化 | R09_optimization_report.txt + optimized_data.parquet |
 | C13 | divide_subset | 按分类划分数据集 | R10_division_report.txt + 18个子集文件 |
-| C14 | visualize_length_preference | 长度偏好可视化 | R11_length_preference_report.txt + T01-T02 + P04-P05 |
-| C15 | visualize_format_preference | 格式偏好可视化 | R12_format_preference_report.txt + T03-T08 + P06-P10 |
-| C16 | length_test | Wilcoxon长度偏好检验（10子集） | R13（待执行） |
-| C17 | format_test | 格式偏好检验（Wilcoxon+卡方+LR） | R14（待执行） |
-| C18 | calculate_effect_size | 效应量量化（Cohen's d 等） | R15（待执行） |
-| C19 | pure_effect | 分层逻辑回归净效应 | R16（待执行） |
-| C20 | length_effect_robust | PSM + IPW 稳健性检验 | R17（待执行） |
-| C21 | enhanced_matching_diagnostics | 匹配诊断+能力代理变量 | R18（待执行） |
+| C14 | visualize_length_preference | 长度偏好可视化（差值分析）| R11 + T01 + P05 |
+| C15 | visualize_format_preference | 格式偏好可视化（新增格式密度）| R12 + T03-T08 + P06-P10 |
+| C16 | length_test | Wilcoxon 长度偏好检验 + Bonferroni + Bootstrap CI + Cohen's d | R13 ✅ |
+| C17 | format_test | 格式偏好检验（Wilcoxon + 密度辅助 + 卡方）| R14 ✅ |
+| C18 | pure_effect | 净效应嵌套逻辑回归（长度 M0→M3；格式 F0→F3；C13 子集）| R16 ✅ |
+| C19 | length_effect_robust | IPW 稳健性检验 | R17 ⏳ |
+| C20 | enhanced_matching_diagnostics | 匹配诊断 + Within-pair Wilcoxon | R18 ⏳ |
 
 ### 生成的数据文件
 
@@ -126,8 +125,8 @@ Reports/
                          │
         ┌────────────────▼────────────────┐
         │ optimized_data.parquet          │
-        │ 108,280行 × 31列                │
-        │ (过滤27,354行，保留率79.83%)   │
+        │ 108,171行 × 32列                │
+        │ (过滤27,463行，保留率79.75%)   │
         └────────────────┬────────────────┘
                          │
                    C13 divide_subset
@@ -177,15 +176,19 @@ writing  orders orders   subsets intersect data  data
   ├─ C14: 长度偏好可视化 (双轴折线图 + 分箱统计)
   └─ C15: 格式偏好可视化 (存在性/数量/组合三维分析)
 
-第六层：统计检验 (C16-C18，待执行)
-  ├─ C16: Wilcoxon 符号秩检验 (长度，10子集)
-  ├─ C17: 格式偏好混合检验 (Wilcoxon + 卡方 + 逻辑回归)
-  └─ C18: 效应量量化 (Cohen's d, Hedges' g, rank-biserial)
+第六层：统计检验 (C16-C17，已完成)
+  ├─ C16: Wilcoxon 符号秩检验（长度，13 子集，12/13 显著）
+  └─ C17: 格式偏好混合检验（Wilcoxon + 密度辅助 + 卡方）
 
-第七层：混淆控制 (C19-C21，待执行)
-  ├─ C19: 分层逻辑回归净效应
-  ├─ C20: PSM + IPW 稳健性
-  └─ C21: 匹配诊断 + 能力代理变量
+第六.五层：净效应分析 (C18，已完成)
+  └─ C18: 嵌套逻辑回归（长度 M0→M3；格式 F0→F3；混淆比例；C13 子集）
+
+第七层：稳健性检验 (C19-C20，待执行)
+  ├─ C19: IPW 稳健性检验
+  └─ C20: 匹配质量诊断 + Within-pair Wilcoxon
+
+第八层：因果推断 (C21，待编码)
+  └─ C21: SEM 路径分析（回复级中介变量）
 ```
 
 ### 模块化设计
