@@ -16,7 +16,6 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from collections import Counter
-from typing import Set
 
 
 def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
@@ -73,14 +72,13 @@ def verify_token_correction(file_path: Path | str | None = None,
 
     print(f"  读取成功，数据形状: {df.shape}")
 
-    # 初始化统计变量，包括不一致计数、缺失字段行 ID 集合、无效结构行 ID 集合，以及 role 分布统计
+    # 方法：仅对需要追溯示例的异常保留样本列表，其余异常只维护计数即可。
     mismatch_user_sum_count: int = 0
     mismatch_assistant_sum_count: int = 0
     user_exceeds_expected_count: int = 0
-    missing_metadata_rows: Set[object] = set()
-    missing_token_columns_rows: Set[object] = set()
-    invalid_conversation_b_rows: Set[object] = set()
-    invalid_segment_rows: Set[object] = set()
+    missing_metadata_count: int = 0
+    missing_token_columns_count: int = 0
+    invalid_conversation_b_count: int = 0
     invalid_segment_count: int = 0
     role_counts: Counter = Counter()
     sample_mismatches: list[tuple[object, int, int, int, int]] = []
@@ -91,14 +89,14 @@ def verify_token_correction(file_path: Path | str | None = None,
         conv_b = getattr(row, "conversation_b", None)
 
         if not isinstance(conv_meta, dict):
-            missing_metadata_rows.add(row_id)
+            missing_metadata_count += 1
             continue
 
         sum_user_tokens = conv_meta.get("sum_user_tokens")
         sum_assistant_b_tokens = conv_meta.get("sum_assistant_b_tokens")
 
         if sum_user_tokens is None or sum_assistant_b_tokens is None:
-            missing_token_columns_rows.add(row_id)
+            missing_token_columns_count += 1
 
         user_token_total: int = 0
         assistant_token_total: int = 0
@@ -108,7 +106,6 @@ def verify_token_correction(file_path: Path | str | None = None,
             for segment in conv_b:
                 if not isinstance(segment, dict):
                     invalid_segment_count += 1
-                    invalid_segment_rows.add(row_id)
                     continue
 
                 role = segment.get("role")
@@ -116,7 +113,6 @@ def verify_token_correction(file_path: Path | str | None = None,
 
                 if role is None or not isinstance(num_tokens, (int, float)):
                     invalid_segment_count += 1
-                    invalid_segment_rows.add(row_id)
                     continue
 
                 role_counts[role] += 1
@@ -125,7 +121,7 @@ def verify_token_correction(file_path: Path | str | None = None,
                 else:
                     user_token_total += int(num_tokens)
         else:
-            invalid_conversation_b_rows.add(row_id)
+            invalid_conversation_b_count += 1
 
         # 验证 token 汇总字段与实际统计值是否一致，并记录不一致的行数和示例
         if isinstance(sum_user_tokens, (int, float)):
@@ -160,9 +156,9 @@ def verify_token_correction(file_path: Path | str | None = None,
     if user_exceeds_expected_count:
         print(f"  反例数量: {user_exceeds_expected_count}")
 
-    print(f"缺失 conv_metadata 行数: {len(missing_metadata_rows)}")
-    print(f"缺失 token 汇总字段行数: {len(missing_token_columns_rows)}")
-    print(f"conversation_b 非列表结构或缺失行数: {len(invalid_conversation_b_rows)}")
+    print(f"缺失 conv_metadata 行数: {missing_metadata_count}")
+    print(f"缺失 token 汇总字段行数: {missing_token_columns_count}")
+    print(f"conversation_b 非列表结构或缺失行数: {invalid_conversation_b_count}")
     print(f"无效 segment 记录数: {invalid_segment_count}")
 
     generate_token_report(
@@ -171,9 +167,9 @@ def verify_token_correction(file_path: Path | str | None = None,
         mismatch_user_sum_count=mismatch_user_sum_count,
         mismatch_assistant_sum_count=mismatch_assistant_sum_count,
         user_exceeds_expected_count=user_exceeds_expected_count,
-        missing_metadata_rows=missing_metadata_rows,
-        missing_token_columns_rows=missing_token_columns_rows,
-        invalid_conversation_b_rows=invalid_conversation_b_rows,
+        missing_metadata_count=missing_metadata_count,
+        missing_token_columns_count=missing_token_columns_count,
+        invalid_conversation_b_count=invalid_conversation_b_count,
         invalid_segment_count=invalid_segment_count,
         role_counts=role_counts,
         sample_mismatches=sample_mismatches,
@@ -185,9 +181,9 @@ def generate_token_report(file_path: Path, total_rows: int,
                           mismatch_user_sum_count: int,
                           mismatch_assistant_sum_count: int,
                           user_exceeds_expected_count: int,
-                          missing_metadata_rows: Set[object],
-                          missing_token_columns_rows: Set[object],
-                          invalid_conversation_b_rows: Set[object],
+                          missing_metadata_count: int,
+                          missing_token_columns_count: int,
+                          invalid_conversation_b_count: int,
                           invalid_segment_count: int,
                           role_counts: Counter,
                           sample_mismatches: list[tuple[object, int, int, int, int]],
@@ -212,9 +208,9 @@ def generate_token_report(file_path: Path, total_rows: int,
         f.write(f"conversation_b role='user' 的 num_tokens 与 sum_user_tokens 不一致行数: {mismatch_user_sum_count}\n")
         f.write(f"conversation_b role='assistant' 的 num_tokens 与 sum_assistant_b_tokens 不一致行数: {mismatch_assistant_sum_count}\n")
         f.write(f"conversation_b role='user' 的 num_tokens 超过 sum_user_tokens 行数: {user_exceeds_expected_count}\n")
-        f.write(f"缺失 conv_metadata 的行数: {len(missing_metadata_rows)}\n")
-        f.write(f"缺失 token 汇总字段的行数: {len(missing_token_columns_rows)}\n")
-        f.write(f"conversation_b 非列表结构或缺失的行数: {len(invalid_conversation_b_rows)}\n")
+        f.write(f"缺失 conv_metadata 的行数: {missing_metadata_count}\n")
+        f.write(f"缺失 token 汇总字段的行数: {missing_token_columns_count}\n")
+        f.write(f"conversation_b 非列表结构或缺失的行数: {invalid_conversation_b_count}\n")
         f.write(f"无效 segment 记录总数: {invalid_segment_count}\n\n")
 
         f.write("2. conversation_b role 分布\n")
@@ -227,10 +223,10 @@ def generate_token_report(file_path: Path, total_rows: int,
         f.write("3. 部分不一致示例\n")
         f.write("-" * 100 + "\n")
         if sample_mismatches:
-            f.write(f"{'id':>10} {'sum_user_tokens':>15} {'user_total':>12} {'sum_assistant_b_tokens':>24} {'assistant_total':>16}\n")
+            f.write(f"{'id':>40} {'sum_user_tokens':>15} {'user_total':>15} {'sum_assistant_b_tokens':>25} {'assistant_total':>15}\n")
             f.write("-" * 100 + "\n")
             for row_id, expect_user, actual_user, expect_assistant, actual_assistant in sample_mismatches:
-                f.write(f"{str(row_id):>10} {expect_user:>15} {actual_user:>12} {expect_assistant:>24} {actual_assistant:>16}\n")
+                f.write(f"{str(row_id):>40} {expect_user:>15} {actual_user:>15} {expect_assistant:>25} {actual_assistant:>15}\n")
         else:
             f.write("无不一致示例。\n")
         f.write("\n")

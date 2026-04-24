@@ -102,7 +102,5 @@ if __name__ == "__main__":
     print("=" * 80)
     print("验证数据分割后的会话完整性")
 
-    # file_paths : list[Path] =  # 可选：传入自定义文件路径列表
-
     # 调用主函数，可选择传入参数 file_paths
     verify_session_integrity()

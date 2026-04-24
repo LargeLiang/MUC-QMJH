@@ -103,9 +103,28 @@ def touch_category_tag(file_path: Path | str | None = None,
     # 缺失数据统计
     invalid_category_tag_rows: int = 0
     missing_submodule_rows: Dict[str, int] = {}
+    criteria_counters: Dict[str, Counter] = {
+        "complexity": complexity_count,
+        "creativity": creativity_count,
+        "domain_knowledge": domain_knowledge_count,
+        "problem_solving": problem_solving_count,
+        "real_world": real_world_count,
+        "specificity": specificity_count,
+        "technical_accuracy": technical_accuracy_count,
+    }
+
+    def increment_if_present(counter: Counter, value: object) -> None:
+        """仅在值有效时累计频数，保持顶级分类计数逻辑简洁。"""
+
+        if value is not None:
+            counter[value] += 1
+
+    def record_missing_submodule(module_name: str) -> None:
+        """统一记录缺失子模块，避免重复的 get+1 模式。"""
+
+        missing_submodule_rows[module_name] = missing_submodule_rows.get(module_name, 0) + 1
 
     for row in df.itertuples(index=False):
-        row_id : object = getattr(row, "id", None)
         category_tag : dict | None = getattr(row, "category_tag", None)
         language : object = getattr(row, "language", None)
         is_code : object = getattr(row, "is_code", None)
@@ -120,53 +139,41 @@ def touch_category_tag(file_path: Path | str | None = None,
         if isinstance(cw, dict):
             cw_val : bool | None = cw.get("creative_writing")
             cw_score : float | None = cw.get("score")
-            if cw_val is not None:
-                creative_writing_count[cw_val] += 1
-            if cw_score is not None:
-                creative_writing_score_count[cw_score] += 1
+            increment_if_present(creative_writing_count, cw_val)
+            increment_if_present(creative_writing_score_count, cw_score)
         else:
-            missing_submodule_rows["creative_writing_v0.1"] = missing_submodule_rows.get("creative_writing_v0.1", 0) + 1
+            record_missing_submodule("creative_writing_v0.1")
 
         # 2. 提取criteria_v0.1模块的数据
         crit : dict | None = category_tag.get("criteria_v0.1")
         if isinstance(crit, dict):
-            # criteria包含7个评估维度，分别统计各维度值的分布
-            complexity_count[crit.get("complexity")] += 1
-            creativity_count[crit.get("creativity")] += 1
-            domain_knowledge_count[crit.get("domain_knowledge")] += 1
-            problem_solving_count[crit.get("problem_solving")] += 1
-            real_world_count[crit.get("real_world")] += 1
-            specificity_count[crit.get("specificity")] += 1
-            technical_accuracy_count[crit.get("technical_accuracy")] += 1
+            # 方法：criteria 维度统一走字段到计数器的映射，减少重复样板代码。
+            for field_name, counter in criteria_counters.items():
+                counter[crit.get(field_name)] += 1
         else:
-            missing_submodule_rows["criteria_v0.1"] = missing_submodule_rows.get("criteria_v0.1", 0) + 1
+            record_missing_submodule("criteria_v0.1")
 
         # 3. 提取if_v0.1模块的数据
         if_mod : dict | None = category_tag.get("if_v0.1")
         if isinstance(if_mod, dict):
             if_val : bool | None = if_mod.get("if")
             if_score : float | None = if_mod.get("score")
-            if if_val is not None:
-                if_count[if_val] += 1
-            if if_score is not None:
-                if_score_count[if_score] += 1
+            increment_if_present(if_count, if_val)
+            increment_if_present(if_score_count, if_score)
         else:
-            missing_submodule_rows["if_v0.1"] = missing_submodule_rows.get("if_v0.1", 0) + 1
+            record_missing_submodule("if_v0.1")
 
         # 4. 提取math_v0.1模块的数据
         math_mod : dict | None = category_tag.get("math_v0.1")
         if isinstance(math_mod, dict):
             math_val : bool | None = math_mod.get("math")
-            if math_val is not None:
-                math_count[math_val] += 1
+            increment_if_present(math_count, math_val)
         else:
-            missing_submodule_rows["math_v0.1"] = missing_submodule_rows.get("math_v0.1", 0) + 1
+            record_missing_submodule("math_v0.1")
 
         # 5. 统计顶级字段
-        if language is not None:
-            language_count[language] += 1
-        if is_code is not None:
-            is_code_count[is_code] += 1
+        increment_if_present(language_count, language)
+        increment_if_present(is_code_count, is_code)
 
     print(f"  发现 {len(creative_writing_count)} 种 creative_writing 值")
     print(f"  发现 {len(creativity_count)} 种 creativity 值")

@@ -13,8 +13,6 @@ C05_touch_order
 
 import pandas as pd
 from pathlib import Path
-from collections import Counter
-from typing import Set
 
 
 def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
@@ -67,27 +65,23 @@ def touch_order(file_path: Path | str | None = None, output_dir: Path | str | No
 
     print(f"  读取成功，数据形状: {df.shape}")
 
-    # 使用 pandas 高效统计每个 order 值的出现次数
+    # 对 order 计数
     order_counts : pd.Series = df["evaluation_order"].value_counts()
 
-    # 提取唯一 order 值集合
-    unique_evaluation_orders : set[int] = set(order_counts.index)
-
-    print(f"  发现 {len(unique_evaluation_orders)} 种不同的 evaluation_order 字段值")
-    print(f"  分别为 {sorted(unique_evaluation_orders)}")
+    print(f"  发现 {len(order_counts)} 种不同的 evaluation_order 字段值")
+    print(f"  分别为 {sorted(order_counts.index.tolist())}")
 
     # 调用报告生成函数，传入统计结果
     generate_order_report(
         file_path=file_path,
         total_rows=len(df),
-        unique_orders=unique_evaluation_orders,
-        unique_counts=order_counts.to_dict(),
+        order_counts=order_counts,
         output_dir=output_dir
     )
 
 
 def generate_order_report(file_path: Path, total_rows: int,
-                          unique_orders: Set[int], unique_counts: dict,
+                          order_counts: pd.Series,
                           output_dir: Path) -> None:
     """
     生成 evaluation_order 分析报告。
@@ -111,15 +105,15 @@ def generate_order_report(file_path: Path, total_rows: int,
         f.write("-" * 40 + "\n")
         f.write(f"分析文件: {file_path}\n")
         f.write(f"数据总行数: {total_rows}\n")
-        f.write(f"evaluation_order 唯一值数量: {len(unique_orders)}\n\n")
+        f.write(f"evaluation_order 唯一值数量: {len(order_counts)}\n\n")
 
         # 2. 出现次数分布：按 order 值排序显示每个值的出现次数
         f.write("2. 出现次数分布\n")
         f.write("-" * 40 + "\n")
         f.write(f"{'Order':>5} {'出现次数':>10}\n")
         f.write("-" * 40 + "\n")
-        for order in sorted(unique_counts.keys()):
-            f.write(f"{order:>5}{unique_counts[order]:>10}\n")
+        for order, count in order_counts.sort_index().items():
+            f.write(f"{order:>5}{count:>10}\n")
         f.write("\n")
 
         f.write("=" * 80 + "\n")

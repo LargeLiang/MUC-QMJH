@@ -7,12 +7,12 @@ C14_visualize_length_preference
 - 解缠化处理：将配对评价拆分为单模型回复样本
 - 长度差值分箱分析：diff 分箱胜率 + 样本占比双轴折线图
 - 分层描述：对 4 个任务类别子集（CW / IF / MATH / CODE）分别重复上述分析
-- 统计表格：输出差值分箱的 CSV 汇总
+- 统计表格：全量 + 4 个任务类别子集分别输出差值分箱 CSV 汇总
 - 文本报告：全量 + 各子集的描述性结论
 
 数据流向：
   optimized_data.parquet → 解缠化计算 → diff 分箱分析 → 可视化图像输出 →
-  + *_true_data.parquet（4 类子集）→ 分层可视化 → Reports/R11_length_preference_report.txt
+    + *_true_data.parquet（4 类子集）→ 分层可视化 + 分箱 CSV 输出 → Reports/R11_length_preference_report.txt
 """
 
 from pathlib import Path
@@ -47,18 +47,67 @@ def get_optimized_parquet_path(root: Path | str | None = None) -> Path:
     return root_path / "Data" / "optimized_data" / "optimized_data.parquet"
 
 
-def get_length_data_path(root: Path | str | None = None) -> Path:
+def get_length_data_path(root: Path | str | None = None,
+                         subset_slug: str | None = None) -> Path:
     """
     返回长度数据 parquet 文件的默认路径。
     
     此路径用于存储预处理后的长度特征数据，可用于后续快速分析。
+    当 subset_slug 为 None 时，返回全量缓存路径；否则返回对应子集缓存路径。
     """
     if root is None:
         root_path = Path.cwd()
     else:
         root_path = Path(root)
-    
-    return root_path / "Data" / "length_data" / "length_data.parquet"
+
+    length_data_dir = root_path / "Data" / "length_data"
+    if subset_slug is None:
+        return length_data_dir / "length_data.parquet"
+    return length_data_dir / f"{subset_slug}_length_data.parquet"
+
+
+def get_chart_output_path(order_index: int,
+                          slug: str,
+                          root: Path | str | None = None) -> Path:
+    """返回长度偏好图表输出路径，统一使用 P04_XX 编号。"""
+
+    if root is None:
+        root_path = Path.cwd()
+    else:
+        root_path = Path(root)
+
+    return root_path / "Pictures" / f"P04_{order_index:02d}_{slug}_length_diff_line_chart.png"
+
+
+def get_table_output_path(order_index: int,
+                          slug: str,
+                          root: Path | str | None = None) -> Path:
+    """返回长度偏好统计表输出路径，统一使用 T01_XX 编号。"""
+
+    if root is None:
+        root_path = Path.cwd()
+    else:
+        root_path = Path(root)
+
+    return root_path / "Tables" / f"T01_{order_index:02d}_{slug}_length_diff_analysis_stats.csv"
+
+
+def save_length_data_cache(length_data: pd.DataFrame,
+                           cache_path: Path | str) -> None:
+    """
+    保存解缠化后的长度数据缓存。
+
+    方法说明：全量与子集都走同一缓存写出逻辑，避免只有全量保存中间结果而子集缺失。
+    """
+
+    cache_path = Path(cache_path)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        length_data.to_parquet(cache_path, index=False)
+        print(f"  长度数据缓存已保存: {cache_path}")
+    except Exception as exc:
+        print(f"  WARNING: 缓存保存失败 - {exc}")
 
 
 def prepare_length_data(df: pd.DataFrame) -> pd.DataFrame:
@@ -285,23 +334,23 @@ def plot_length_diff_preference_chart(diff_bin_stats: pd.DataFrame,
 
 
 def create_statistical_table(diff_bin_stats: pd.DataFrame,
-                             output_dir: Path | str | None = None) -> pd.DataFrame:
+                             output_path: Path | str | None = None) -> pd.DataFrame:
     """
     将差值分箱统计数据保存为 CSV 表格。
 
     参数说明：
     - diff_bin_stats：长度差值分箱统计数据
-    - output_dir：输出目录（默认为 Tables）
+    - output_path：输出文件路径（默认为 T01_01_full_length_diff_analysis_stats.csv）
 
     返回值：处理后的表格数据框
     """
     print("创建统计表格...")
 
-    if output_dir is None:
-        output_dir = Path.cwd() / "Tables"
+    if output_path is None:
+        output_path = get_table_output_path(1, "full")
     else:
-        output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # 从 Interval 对象中提取左右边界，便于 CSV 中展示数值范围
     diff_stats_table = diff_bin_stats.copy()
@@ -320,9 +369,8 @@ def create_statistical_table(diff_bin_stats: pd.DataFrame,
     output_cols = ['分箱左边界', '分箱右边界', '分箱中心值', '胜率', '样本数量', '样本占比']
     diff_stats_table = diff_stats_table[output_cols]
 
-    diff_stats_path = output_dir / "T01_length_diff_analysis_stats.csv"
-    diff_stats_table.to_csv(diff_stats_path, index=False, encoding='utf-8-sig')
-    print(f"  长度差值统计表格保存到: {diff_stats_path}")
+    diff_stats_table.to_csv(output_path, index=False, encoding='utf-8-sig')
+    print(f"  长度差值统计表格保存到: {output_path}")
 
     return diff_stats_table
 
@@ -417,9 +465,12 @@ if __name__ == "__main__":
     chart_dir = Path.cwd() / "Pictures"
     report_dir = Path.cwd() / "Reports"
     table_dir = Path.cwd() / "Tables"
+
+    # 创建必要的目录
     for d in [chart_dir, report_dir, table_dir]:
         d.mkdir(parents=True, exist_ok=True)
 
+    # 分箱数量配置：根据样本量和分布情况调整，默认 20 箱
     n_bins = 20
 
     print(f"\n加载数据: {input_file_path}")
@@ -436,22 +487,17 @@ if __name__ == "__main__":
     length_data = prepare_length_data(df)
 
     # 1.1 保存解缠化缓存
-    length_data_path = get_length_data_path()
-    length_data_path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        length_data.to_parquet(length_data_path, index=False)
-        print(f"  长度数据缓存已保存: {length_data_path}")
-    except Exception as e:
-        print(f"  WARNING: 缓存保存失败 - {e}")
+    save_length_data_cache(length_data, get_length_data_path())
 
     # 1.2 分箱 + 可视化
+    full_chart_path = get_chart_output_path(1, "full")
     diff_bin_stats = create_length_diff_bins(length_data, n_bins)
     diff_best_bin, diff_best_win_rate, best_avg_diff = plot_length_diff_preference_chart(
-        diff_bin_stats, chart_dir / "P05_length_diff_line_chart.png"
+        diff_bin_stats, full_chart_path
     )
 
     # 1.3 统计表格
-    create_statistical_table(diff_bin_stats, table_dir)
+    create_statistical_table(diff_bin_stats, get_table_output_path(1, "full"))
 
     # 1.4 报告（首次写入，覆写模式）
     report_path = report_dir / "R11_length_preference_report.txt"
@@ -462,14 +508,14 @@ if __name__ == "__main__":
 
     # 2. 分层子集分析
     subset_configs = [
-        ("creative_writing_true_data.parquet", "CW（创意写作）"),
-        ("if_true_data.parquet", "IF（指令跟随）"),
-        ("math_true_data.parquet", "MATH（数学）"),
-        ("code_true_data.parquet", "CODE（代码）"),
+        (2, "creative_writing_true_data.parquet", "creative_writing_true", "CW"),
+        (3, "if_true_data.parquet", "if_true", "IF"),
+        (4, "math_true_data.parquet", "math_true", "MATH"),
+        (5, "code_true_data.parquet", "code_true", "CODE"),
     ]
     subset_dir = Path.cwd() / "Data" / "optimized_data"
 
-    for filename, tag in subset_configs:
+    for order_index, filename, slug, tag in subset_configs:
         subset_path = subset_dir / filename
         if not subset_path.exists():
             print(f"\n  WARNING: 子集文件不存在，跳过 {filename}")
@@ -483,19 +529,21 @@ if __name__ == "__main__":
         print(f"  子集形状: {df_sub.shape}")
 
         length_data_sub = prepare_length_data(df_sub)
+        save_length_data_cache(length_data_sub, get_length_data_path(subset_slug=slug))
 
         # 子集若样本量不足以 n_bins 分箱则降为 10 箱
         bins_sub = n_bins if len(length_data_sub) >= n_bins * 30 else 10
         diff_bin_stats_sub = create_length_diff_bins(length_data_sub, bins_sub)
 
-        chart_name = f"P05_{filename.replace('_data.parquet', '')}_length_diff.png"
         diff_best_bin_sub, diff_best_win_rate_sub, best_avg_diff_sub = (
             plot_length_diff_preference_chart(
                 diff_bin_stats_sub,
-                chart_dir / chart_name,
+                get_chart_output_path(order_index, slug),
                 title_suffix=f" [{tag}]"
             )
         )
+
+        create_statistical_table(diff_bin_stats_sub, get_table_output_path(order_index, slug))
 
         # 以追加模式写入同一报告
         generate_analysis_report(

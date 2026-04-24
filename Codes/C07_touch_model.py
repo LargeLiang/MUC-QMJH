@@ -14,8 +14,7 @@ C07_touch_model
 
 import pandas as pd
 from pathlib import Path
-from collections import Counter
-from typing import Dict, Set
+from typing import Dict
 
 
 def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
@@ -69,46 +68,32 @@ def touch_model(file_path: Path | str | None = None, output_dir: Path | str | No
 
     print(f"  读取成功，数据形状: {df.shape}")
 
-    # 初始化统计变量
-    models : Set[str] = set()  # 存储所有唯一模型名称
-    model_counts : Counter = Counter()  # 统计每个模型的总出场次数
-    model_wins : Counter = Counter()  # 统计每个模型的胜场次数
+    model_counts : pd.Series = pd.concat(
+        [df["model_a"], df["model_b"]],
+        ignore_index=True,
+    ).value_counts()
 
-    # 第一遍遍历：统计模型出现次数
-    # 每个模型在 model_a 或 model_b 中出现一次算一次出场
-    for idx in range(len(df)):
-        model_a : str = df.iloc[idx]['model_a']
-        model_b : str = df.iloc[idx]['model_b']
-        models.add(model_a)
-        models.add(model_b)
-        model_counts[model_a] += 1
-        model_counts[model_b] += 1
-
-    # 第二遍遍历：统计胜场次数
-    # 只考虑 winner 为 'model_a' 或 'model_b' 的行，排除 'tie' 或 'both_bad'
-    winner_df = df[df['winner'].isin(['model_a', 'model_b'])]
-    for _, row in winner_df.iterrows():
-        # 根据 winner 字段确定胜者模型
-        # row['winner'] 是 'model_a' 或 'model_b'，row[row['winner']] 是对应的模型名
-        winner_model : str = row[row['winner']]
-        model_wins[winner_model] += 1
+    winner_df : pd.DataFrame = df[df["winner"].isin(["model_a", "model_b"])]
+    winner_models : pd.Series = pd.concat(
+        [
+            winner_df.loc[winner_df["winner"] == "model_a", "model_a"],
+            winner_df.loc[winner_df["winner"] == "model_b", "model_b"],
+        ],
+        ignore_index=True,
+    )
+    model_wins : pd.Series = winner_models.value_counts()
 
     # 计算胜率：胜场次数 / 总出场次数
     model_win_rates : Dict[str, float] = {}
-    for model in models:
-        # 避免除零错误，虽然理论上每个模型至少出现一次
-        if model_counts[model] > 0:
-            model_win_rates[model] = model_wins[model] / model_counts[model]
-        else:
-            model_win_rates[model] = 0.0
+    for model, count in model_counts.items():
+        model_win_rates[model] = float(model_wins.get(model, 0)) / float(count)
 
-    print(f"  发现 {len(models)} 种不同的模型")
+    print(f"  发现 {len(model_counts)} 种不同的模型")
 
     # 生成报告
     generate_model_report(
         file_path=file_path,
         total_rows=len(df),
-        models=models,
         model_counts=model_counts,
         model_wins=model_wins,
         model_win_rates=model_win_rates,
@@ -116,8 +101,8 @@ def touch_model(file_path: Path | str | None = None, output_dir: Path | str | No
     )
 
 
-def generate_model_report(file_path: Path, total_rows: int, models: Set[str],
-                          model_counts: Counter, model_wins: Counter,
+def generate_model_report(file_path: Path, total_rows: int,
+                          model_counts: pd.Series, model_wins: pd.Series,
                           model_win_rates: Dict[str, float], output_dir: Path) -> None:
     """
     生成模型分析报告。
@@ -141,15 +126,14 @@ def generate_model_report(file_path: Path, total_rows: int, models: Set[str],
         f.write("-" * 100 + "\n")
         f.write(f"分析文件: {file_path}\n")
         f.write(f"数据总行数: {total_rows}\n")
-        f.write(f"出现的模型总数: {len(models)}\n\n")
+        f.write(f"出现的模型总数: {len(model_counts)}\n\n")
 
         # 2. 模型出现次数排名
         f.write("2. 模型出现次数排名\n")
         f.write("-" * 100 + "\n")
         f.write(f"{'排名':^10} {'出场次数':^10} {'模型名称':^80}\n")
         f.write("-" * 100 + "\n")
-        # 按出场次数降序排序
-        sorted_model_counts = model_counts.most_common(len(models))
+        sorted_model_counts = list(model_counts.items())
         for i, (model, count) in enumerate(sorted_model_counts, 1):
             f.write(f"{i:^10} {count:^10} {model:^80}\n")
         f.write("\n")
@@ -158,7 +142,7 @@ def generate_model_report(file_path: Path, total_rows: int, models: Set[str],
         f.write("3. 模型胜率排名\n")
         f.write("-" * 100 + "\n")
         # 按胜率降序排序
-        sorted_models = sorted(models, key=lambda m: model_win_rates[m], reverse=True)
+        sorted_models = sorted(model_win_rates.keys(), key=lambda m: model_win_rates[m], reverse=True)
         f.write(f"{'排名':^10} {'总出场':^10} {'胜场':^10} {'胜率':^10} {'模型名称':^80}\n")
         f.write("-" * 100 + "\n")
         for i, model in enumerate(sorted_models, 1):
@@ -170,23 +154,23 @@ def generate_model_report(file_path: Path, total_rows: int, models: Set[str],
         f.write("-" * 40 + "\n")
 
         # 计算平均出现次数
-        avg_count = sum(model_counts.values()) / len(models) if models else 0
+        avg_count = float(model_counts.sum()) / len(model_counts) if not model_counts.empty else 0
         f.write(f"平均模型出现次数: {avg_count:.2f}\n")
 
         # 找出出现次数最多和最少的模型
-        if models:
-            most_model = max([(m, model_counts[m]) for m in models], key=lambda x: x[1])
-            least_model = min([(m, model_counts[m]) for m in models], key=lambda x: x[1])
+        if not model_counts.empty:
+            most_model = (model_counts.idxmax(), int(model_counts.max()))
+            least_model = (model_counts.idxmin(), int(model_counts.min()))
             f.write(f"出现最多的模型: {most_model[0]} ({most_model[1]}次)\n")
             f.write(f"出现最少的模型: {least_model[0]} ({least_model[1]}次)\n\n")
 
             # 计算平均胜率
-            avg_win_rate = sum(model_win_rates.values()) / len(models)
+            avg_win_rate = sum(model_win_rates.values()) / len(model_win_rates)
             f.write(f"平均模型胜率: {avg_win_rate:.2%}\n")
 
             # 找出胜率最高和最低的模型
-            best_model = max([(m, model_win_rates[m]) for m in models], key=lambda x: x[1])
-            worst_model = min([(m, model_win_rates[m]) for m in models], key=lambda x: x[1])
+            best_model = max(model_win_rates.items(), key=lambda x: x[1])
+            worst_model = min(model_win_rates.items(), key=lambda x: x[1])
             f.write(f"胜率最高的模型: {best_model[0]} ({best_model[1]:.2%})\n")
             f.write(f"胜率最低的模型: {worst_model[0]} ({worst_model[1]:.2%})\n")
 

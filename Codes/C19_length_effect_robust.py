@@ -1,317 +1,521 @@
 # -*- coding: utf-8 -*-
 """
-Robust length effect analysis using direct longer-wins labels, logistic regression, and propensity score matching.
-输出：Reports/R17_length_effect_robust_report.txt
+长度效应稳健性分析（调整逻辑回归 + IPW）。
+
+研究问题：
+  在控制任务类型、问题属性、模型能力与格式风格后，
+  “A 是否更长”这一处理变量是否仍然显著提高 A 获胜的概率？
+
+方法说明：
+  1. 处理变量：longer_a = 1（a_tokens > b_tokens），0（a_tokens < b_tokens）
+  2. 长度平局（a_tokens == b_tokens）直接剔除，避免把 tie 混入对照组
+  3. 结果变量：winner_a = 1（model_a 获胜）
+  4. 混淆变量：
+     - prompt 负荷：user_tokens, turns
+     - 任务类型：creative_writing_bool, if_bool, math_bool, code_bool
+     - 问题级控制：7 个 criteria
+     - 模型级代理：ability_diff, verbosity_diff, format_tendency_diff
+     - 格式控制：header/list/bold_density_diff
+  5. 稳健性估计：
+     - 调整逻辑回归（OR 与 95% CI）
+     - IPW ATE（bootstrap 95% CI）
+
+输出：
+  - Reports/R17_length_effect_robust_report.txt
+  - Tables/T14_length_robust_summary.csv
+    - Pictures/P16_length_robust_forest.png
 """
 
-import os
+from __future__ import annotations
+
+import argparse
 import warnings
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
-from sklearn.exceptions import ConvergenceWarning
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import pairwise_distances_argmin_min
-from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
+from statsmodels.tools.sm_exceptions import ConvergenceWarning
+
+from C18_pure_effect import (
+    CRITERIA_COLS,
+    SUBSET_LABELS_EN,
+    TASK_TYPE_COLS,
+    build_model_stats,
+    get_subset_paths,
+    load_data_global,
+    load_subset,
+)
 
 
-def extract_count(value, feature_type=None):
-    if isinstance(value, dict):
-        if feature_type == 'header':
-            return sum(value.get(f'h{i}', 0) for i in range(1, 7))
-        if feature_type == 'list':
-            return value.get('ordered', 0) + value.get('unordered', 0)
-        if feature_type == 'bold':
-            return value.get('**', 0) + value.get('__', 0)
-        return sum(value.values())
-    if pd.isna(value):
-        return 0
-    try:
-        return float(value)
-    except Exception:
-        return 0
+CONTINUOUS_CONFOUNDERS: list[str] = [
+    "user_tokens",
+    "turns",
+    "ability_diff",
+    "verbosity_diff",
+    "format_tendency_diff",
+    "header_density_diff",
+    "list_density_diff",
+    "bold_density_diff",
+]
 
 
-def load_optimized_data(root=None):
+def get_report_path(root: Path | str | None = None) -> Path:
+    """返回 R17 报告路径。"""
     if root is None:
-        root = os.getcwd()
-    path = Path(root) / 'Data' / 'optimized_data' / 'optimized_data.parquet'
-    df = pd.read_parquet(path)
-    return df[df['winner'].isin(['model_a', 'model_b'])].copy()
+        root = Path.cwd()
+    return Path(root) / "Reports" / "R17_length_effect_robust_report.txt"
 
 
-def prepare_robust_data(df):
-    df = df.copy()
-    df['winner_a'] = (df['winner'] == 'model_a').astype(int)
-    df['length_diff_ab'] = df['a_tokens'] - df['b_tokens']
-    df['longer_a'] = (df['length_diff_ab'] > 0).astype(int)
-    df['length_tie'] = (df['length_diff_ab'] == 0).astype(int)
-    df['longer_wins'] = (((df['length_diff_ab'] > 0) & (df['winner'] == 'model_a')) |
-                         ((df['length_diff_ab'] < 0) & (df['winner'] == 'model_b'))).astype(int)
-    df['header_diff_ab'] = df.apply(lambda r: extract_count(r['a_header_counts'], 'header') - extract_count(r['b_header_counts'], 'header'), axis=1)
-    df['list_diff_ab'] = df.apply(lambda r: extract_count(r['a_list_counts'], 'list') - extract_count(r['b_list_counts'], 'list'), axis=1)
-    df['bold_diff_ab'] = df.apply(lambda r: extract_count(r['a_bold_counts'], 'bold') - extract_count(r['b_bold_counts'], 'bold'), axis=1)
-    return df
+def get_table_path(root: Path | str | None = None) -> Path:
+    """返回 R17 汇总表路径。"""
+    if root is None:
+        root = Path.cwd()
+    return Path(root) / "Tables" / "T14_length_robust_summary.csv"
 
 
-def available_confounders(df):
-    confounders = [
-        'user_tokens', 'turns', 'is_code',
-        'creative_writing_bool', 'if_bool', 'math_bool',
-        'complexity', 'creativity', 'domain_knowledge',
-        'problem_solving', 'real_world', 'specificity', 'technical_accuracy'
-    ]
-    return [c for c in confounders if c in df.columns]
+def get_picture_path(root: Path | str | None = None) -> Path:
+    """返回 R17 森林图路径。"""
+    if root is None:
+        root = Path.cwd()
+    return Path(root) / "Pictures" / "P16_length_robust_forest.png"
 
 
-def fit_logistic_model(X, y, robust=True):
-    X = sm.add_constant(X, has_constant='add')
+def _zscore(series: pd.Series) -> pd.Series:
+    """对连续变量做 z 标准化，常数列返回 0。"""
+    mu = float(series.mean())
+    sigma = float(series.std(ddof=1))
+    if sigma <= 0 or np.isnan(sigma):
+        return pd.Series(np.zeros(len(series)), index=series.index, dtype=float)
+    return ((series - mu) / sigma).astype(float)
+
+
+def prepare_subset_for_robustness(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    构造稳健性分析数据表。
+
+    返回值：
+    - 剔除长度平局后的子集
+    - 新增 longer_a, longer_wins
+    - 所有连续混淆变量完成 z 标准化
+    """
+    s = df.copy()
+    s = s[s["token_diff_ab"] != 0].copy()
+    s["longer_a"] = (s["token_diff_ab"] > 0).astype(int)
+    s["longer_wins"] = (s["longer_a"] == s["winner_a"]).astype(int)
+
+    for col in CONTINUOUS_CONFOUNDERS:
+        if col in s.columns:
+            s[col] = _zscore(s[col])
+
+    for col in TASK_TYPE_COLS + CRITERIA_COLS + ["winner_a", "longer_a", "longer_wins"]:
+        if col in s.columns:
+            s[col] = s[col].astype(float)
+
+    return s
+
+
+def active_confounders(df: pd.DataFrame) -> list[str]:
+    """返回当前子集可用且非常数的混淆变量。"""
+    candidates = CONTINUOUS_CONFOUNDERS + TASK_TYPE_COLS + CRITERIA_COLS
+    return [col for col in candidates if col in df.columns and df[col].nunique(dropna=True) > 1]
+
+
+def fit_logit_effect(df: pd.DataFrame, predictors: list[str]) -> dict[str, float] | None:
+    """
+    拟合 winner_a 的逻辑回归并提取 longer_a 的效应量。
+
+    返回值：coef, se, p, OR, OR 95% CI, pseudo_r2。
+    """
+    if not predictors:
+        return None
+
+    X = df[predictors].astype(float)
+    y = df["winner_a"].astype(float)
+    X = sm.add_constant(X, has_constant="add")
     model = sm.Logit(y, X)
     try:
         with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', category=ConvergenceWarning)
-            res = model.fit(disp=0, maxiter=500)
-        return res
-    except Exception as e:
-        print('Statsmodels Logit failed, fallback to sklearn:', e)
-        try:
-            X_np = X.astype(float).values
-            y_np = y.astype(int).values
-            sklearn_model = LogisticRegression(max_iter=1000, solver='liblinear')
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=ConvergenceWarning)
-                sklearn_model.fit(X_np, y_np)
-            probs = sklearn_model.predict_proba(X_np)[:, 1]
-            ll = np.sum(y_np * np.log(probs + 1e-15) + (1 - y_np) * np.log(1 - probs + 1e-15))
-            p0 = y_np.mean()
-            ll_null = np.sum(y_np * np.log(p0 + 1e-15) + (1 - y_np) * np.log(1 - p0 + 1e-15))
-            pseudo_r2 = 1 - ll / ll_null if ll_null != 0 else np.nan
-            W = np.diag(probs * (1 - probs))
-            cov = np.linalg.pinv(X_np.T @ W @ X_np)
-            se = np.sqrt(np.diag(cov))
-            params = np.concatenate(([sklearn_model.intercept_[0]], sklearn_model.coef_.ravel()))
-            names = list(X.columns)
-            if len(params) != len(names):
-                names = ['const'] + [f'x{i}' for i in range(X_np.shape[1])]
-            se = np.sqrt(np.abs(np.diag(cov)))
-            return {
-                'type': 'sklearn',
-                'params': pd.Series(params, index=names),
-                'bse': pd.Series(se, index=names),
-                'pvalues': pd.Series(np.nan, index=names),
-                'llf': ll,
-                'llnull': ll_null,
-            }
-        except Exception as ee:
-            print('Sklearn fallback failed:', ee)
-            return None
-
-
-def logistic_summary(res, variable):
-    if res is None:
+            warnings.filterwarnings("ignore", category=ConvergenceWarning)
+            warnings.filterwarnings("ignore", category=RuntimeWarning)
+            result = model.fit(disp=0, maxiter=300)
+    except Exception:
         return None
-    if isinstance(res, dict):
-        coef = res['params'].get(variable, np.nan)
-        se = res['bse'].get(variable, np.nan)
-        p = res['pvalues'].get(variable, np.nan)
-        llf = res.get('llf', np.nan)
-        llnull = res.get('llnull', np.nan)
-    else:
-        coef = res.params.get(variable, np.nan)
-        se = res.bse.get(variable, np.nan)
-        p = res.pvalues.get(variable, np.nan)
-        llf = res.llf
-        llnull = res.llnull
-    odds_ratio = np.exp(coef) if not pd.isna(coef) else np.nan
-    pseudo_r2 = 1 - llf / llnull if llnull != 0 else np.nan
+
+    coef = float(result.params.get("longer_a", np.nan))
+    se = float(result.bse.get("longer_a", np.nan))
+    pval = float(result.pvalues.get("longer_a", np.nan))
+    ci_low = coef - 1.96 * se
+    ci_high = coef + 1.96 * se
+    pseudo_r2 = 1 - result.llf / result.llnull if result.llnull != 0 else np.nan
     return {
-        'coef': float(coef),
-        'se': float(se),
-        'p': float(p) if not pd.isna(p) else np.nan,
-        'or': float(odds_ratio),
-        'pseudo_r2': float(pseudo_r2) if not pd.isna(pseudo_r2) else np.nan
+        "coef": coef,
+        "se": se,
+        "p": pval,
+        "or": float(np.exp(coef)),
+        "or_ci_low": float(np.exp(ci_low)),
+        "or_ci_high": float(np.exp(ci_high)),
+        "pseudo_r2": float(pseudo_r2),
     }
 
 
-def propensity_score_matching(df, confounders, treatment='longer_a', caliper=0.05):
-    df = df.copy()
-    if treatment not in df.columns:
-        return None
-    if len(df[confounders].dropna()) != len(df):
-        df = df.dropna(subset=confounders + [treatment, 'winner_a'])
-    X = df[confounders].copy()
-    X = X.astype(float)
-    scaler = StandardScaler()
-    X = scaler.fit_transform(X)
-    y = df[treatment].astype(int)
-    model = LogisticRegression(max_iter=1000, solver='liblinear')
-    with warnings.catch_warnings():
-        warnings.filterwarnings('ignore', category=ConvergenceWarning)
-        model.fit(X, y)
-    ps = model.predict_proba(X)[:, 1]
-    df['pscore'] = ps
-
-    treated = df[df[treatment] == 1].reset_index(drop=True)
-    control = df[df[treatment] == 0].reset_index(drop=True)
-    if len(treated) == 0 or len(control) == 0:
+def fit_propensity_scores(
+    df: pd.DataFrame,
+    confounders: list[str],
+) -> tuple[np.ndarray, np.ndarray] | None:
+    """拟合 longer_a 的倾向得分模型并返回标准化后的倾向得分。"""
+    if not confounders:
         return None
 
-    nbrs = NearestNeighbors(n_neighbors=1).fit(control[['pscore']].values)
-    dist, idx = nbrs.kneighbors(treated[['pscore']].values)
-    matched = []
-    for i, d in enumerate(dist[:, 0]):
-        if d <= caliper:
-            matched.append((i, idx[i, 0], d))
-    if not matched:
-        return None
-
-    treated_idx = [t for t, _, _ in matched]
-    control_idx = [c for _, c, _ in matched]
-    treated_matched = treated.iloc[treated_idx].reset_index(drop=True)
-    control_matched = control.iloc[control_idx].reset_index(drop=True)
-    effect = treated_matched['winner_a'].mean() - control_matched['winner_a'].mean()
-    return {
-        'n_treated': len(treated_matched),
-        'n_control': len(control_matched),
-        'treated_rate': float(treated_matched['winner_a'].mean()),
-        'control_rate': float(control_matched['winner_a'].mean()),
-        'average_treatment_effect': float(effect),
-        'mean_distance': float(np.mean([d for _, _, d in matched]))
-    }
-
-
-def ipw_estimate(df, confounders, treatment='longer_a'):
-    df = df.copy()
-    df = df.dropna(subset=confounders + [treatment, 'winner_a'])
     X = df[confounders].astype(float)
+    t = df["longer_a"].astype(int)
+    if t.nunique() < 2:
+        return None
+
     scaler = StandardScaler()
-    X = scaler.fit_transform(X)
-    y = df[treatment].astype(int)
-    model = LogisticRegression(max_iter=1000, solver='liblinear')
-    with warnings.catch_warnings():
-        warnings.filterwarnings('ignore', category=ConvergenceWarning)
-        model.fit(X, y)
-    ps = model.predict_proba(X)[:, 1]
-    ps = np.clip(ps, 0.01, 0.99)
-    df['weight'] = df[treatment] / ps + (1 - df[treatment]) / (1 - ps)
-    weighted_treated = np.average(df.loc[df[treatment] == 1, 'winner_a'], weights=df.loc[df[treatment] == 1, 'weight'])
-    weighted_control = np.average(df.loc[df[treatment] == 0, 'winner_a'], weights=df.loc[df[treatment] == 0, 'weight'])
+    X_scaled = scaler.fit_transform(X)
+
+    model = LogisticRegression(max_iter=1000, solver="lbfgs")
+    model.fit(X_scaled, t)
+    pscore = model.predict_proba(X_scaled)[:, 1]
+    pscore = np.clip(pscore, 0.01, 0.99)
+    return pscore, X_scaled
+
+
+def compute_ipw_ate(
+    df: pd.DataFrame,
+    confounders: list[str],
+) -> dict[str, float] | None:
+    """计算稳定化 IPW ATE。"""
+    fitted = fit_propensity_scores(df, confounders)
+    if fitted is None:
+        return None
+
+    pscore, _ = fitted
+    t = df["longer_a"].to_numpy(dtype=float)
+    y = df["winner_a"].to_numpy(dtype=float)
+    treat_rate = float(t.mean())
+
+    weight = np.where(t == 1, treat_rate / pscore, (1 - treat_rate) / (1 - pscore))
+    treated_mask = t == 1
+    control_mask = t == 0
+    if treated_mask.sum() == 0 or control_mask.sum() == 0:
+        return None
+
+    treated_mean = float(np.average(y[treated_mask], weights=weight[treated_mask]))
+    control_mean = float(np.average(y[control_mask], weights=weight[control_mask]))
+    ess = float((weight.sum() ** 2) / np.square(weight).sum())
     return {
-        'weighted_treated_rate': float(weighted_treated),
-        'weighted_control_rate': float(weighted_control),
-        'ipw_effect': float(weighted_treated - weighted_control)
+        "treated_mean": treated_mean,
+        "control_mean": control_mean,
+        "ate": treated_mean - control_mean,
+        "ess": ess,
+        "ps_min": float(pscore.min()),
+        "ps_max": float(pscore.max()),
     }
 
 
-def subset_names():
-    return {
-        'Overall': lambda df: df,
-        'Creative Writing': lambda df: df[df['creative_writing_bool'] == True],
-        'Instruction Following': lambda df: df[df['if_bool'] == True],
-        'Math': lambda df: df[df['math_bool'] == True],
-        'Only Creative Writing': lambda df: df[(df['creative_writing_bool'] == True) & (df['if_bool'] == False) & (df['math_bool'] == False)],
-        'Only IF': lambda df: df[(df['creative_writing_bool'] == False) & (df['if_bool'] == True) & (df['math_bool'] == False)],
-        'Only Math': lambda df: df[(df['creative_writing_bool'] == False) & (df['if_bool'] == False) & (df['math_bool'] == True)],
-        'CW & IF': lambda df: df[(df['creative_writing_bool'] == True) & (df['if_bool'] == True)],
-        'CW & Math': lambda df: df[(df['creative_writing_bool'] == True) & (df['math_bool'] == True)],
-        'IF & Math': lambda df: df[(df['if_bool'] == True) & (df['math_bool'] == True)],
-        'All Categories': lambda df: df[(df['creative_writing_bool'] == True) & (df['if_bool'] == True) & (df['math_bool'] == True)],
-        'No Category': lambda df: df[(df['creative_writing_bool'] == False) & (df['if_bool'] == False) & (df['math_bool'] == False)],
+def bootstrap_ipw_ci(
+    df: pd.DataFrame,
+    confounders: list[str],
+    n_boot: int = 30,
+    seed: int = 42,
+) -> tuple[float, float, int]:
+    """为 IPW ATE 提供 bootstrap 95% CI。"""
+    rng = np.random.default_rng(seed)
+    values: list[float] = []
+    for _ in range(n_boot):
+        sample = df.sample(
+            n=len(df),
+            replace=True,
+            random_state=int(rng.integers(0, 2**32 - 1)),
+        )
+        res = compute_ipw_ate(sample, confounders)
+        if res is not None and not np.isnan(res["ate"]):
+            values.append(float(res["ate"]))
+
+    if not values:
+        return np.nan, np.nan, 0
+    series = pd.Series(values)
+    return float(series.quantile(0.025)), float(series.quantile(0.975)), int(series.shape[0])
+
+
+def analyze_subset(
+    subset_name: str,
+    df: pd.DataFrame,
+    bootstrap_n: int,
+    seed: int,
+) -> tuple[list[str], dict[str, float] | None]:
+    """分析单个子集并返回报告文本块与汇总行。"""
+    lines: list[str] = []
+    s = prepare_subset_for_robustness(df)
+    n = len(s)
+    if n < 100:
+        lines.append(f"【{subset_name}】样本量不足（n={n} < 100），跳过。")
+        return lines, None
+
+    confounders = active_confounders(s)
+    crude = fit_logit_effect(s, ["longer_a"])
+    adjusted = fit_logit_effect(s, ["longer_a"] + confounders)
+    ipw = compute_ipw_ate(s, confounders)
+    ci_low, ci_high, boot_ok = bootstrap_ipw_ci(s, confounders, n_boot=bootstrap_n, seed=seed)
+
+    lines.append("")
+    lines.append("-" * 80)
+    lines.append(f"【{subset_name}】n = {n:,}")
+    lines.append(f"  更长一侧获胜比例：{s['longer_wins'].mean():.4f}")
+    lines.append(f"  A 更长比例：{s['longer_a'].mean():.4f}")
+    lines.append(f"  可用混淆变量数：{len(confounders)}")
+
+    if crude is not None:
+        lines.append(
+            "  粗模型："
+            f"OR={crude['or']:.4f} "
+            f"95% CI [{crude['or_ci_low']:.4f}, {crude['or_ci_high']:.4f}] "
+            f"p={crude['p']:.4g} R²={crude['pseudo_r2']:.4f}"
+        )
+    else:
+        lines.append("  粗模型：拟合失败。")
+
+    if adjusted is not None:
+        lines.append(
+            "  调整模型："
+            f"OR={adjusted['or']:.4f} "
+            f"95% CI [{adjusted['or_ci_low']:.4f}, {adjusted['or_ci_high']:.4f}] "
+            f"p={adjusted['p']:.4g} R²={adjusted['pseudo_r2']:.4f}"
+        )
+    else:
+        lines.append("  调整模型：拟合失败。")
+
+    if ipw is not None:
+        lines.append(
+            "  IPW ATE："
+            f"{ipw['ate']:.4f} "
+            f"95% CI [{ci_low:.4f}, {ci_high:.4f}] "
+            f"ESS={ipw['ess']:.1f} bootstrap_success={boot_ok}/{bootstrap_n}"
+        )
+        lines.append(
+            f"  倾向得分范围：[{ipw['ps_min']:.4f}, {ipw['ps_max']:.4f}]"
+        )
+    else:
+        lines.append("  IPW：估计失败。")
+
+    summary_row = {
+        "subset": subset_name,
+        "n": n,
+        "longer_win_rate": float(s["longer_wins"].mean()),
+        "a_longer_rate": float(s["longer_a"].mean()),
+        "crude_or": crude["or"] if crude else np.nan,
+        "crude_or_ci_low": crude["or_ci_low"] if crude else np.nan,
+        "crude_or_ci_high": crude["or_ci_high"] if crude else np.nan,
+        "crude_p": crude["p"] if crude else np.nan,
+        "adjusted_or": adjusted["or"] if adjusted else np.nan,
+        "adjusted_or_ci_low": adjusted["or_ci_low"] if adjusted else np.nan,
+        "adjusted_or_ci_high": adjusted["or_ci_high"] if adjusted else np.nan,
+        "adjusted_p": adjusted["p"] if adjusted else np.nan,
+        "ipw_ate": ipw["ate"] if ipw else np.nan,
+        "ipw_ci_low": ci_low,
+        "ipw_ci_high": ci_high,
+        "ipw_ess": ipw["ess"] if ipw else np.nan,
+        "bootstrap_success": boot_ok,
     }
+    return lines, summary_row
 
 
-def render_report():
-    root = os.getcwd()
-    df = load_optimized_data(root)
-    df = prepare_robust_data(df)
-    confounders = available_confounders(df)
-
-    report_lines = []
-    report_lines.append('Robust Length Effect Report')
-    report_lines.append('=' * 120)
-    report_lines.append('This analysis uses a direct longer-wins label, logistic regression, matching, and IPW.\n')
-
-    def summary_block(name, subdf):
-        lines = []
-        n = len(subdf)
-        if n == 0:
-            lines.append(f'Subset: {name} has 0 samples, skipped.')
-            return lines
-        longer_wins = subdf['longer_wins'].mean()
-        tie_rate = subdf['length_tie'].mean()
-        longer_a_rate = subdf['longer_a'].mean()
-        lines.append(f'Subset: {name} (n={n})')
-        lines.append(f'  Longer wins frequency: {longer_wins:.4f}')
-        lines.append(f'  Length ties frequency: {tie_rate:.4f}')
-        lines.append(f'  A longer frequency: {longer_a_rate:.4f}')
-        return lines
-
-    report_lines.extend(summary_block('Overall', df))
-    report_lines.append('')
-
-    report_lines.append('Available confounders: ' + ', '.join(confounders))
-    report_lines.append('')
-
-    for subset_name, selector in subset_names().items():
-        subdf = selector(df)
-        if len(subdf) < 30:
-            report_lines.append(f'Subset: {subset_name} skipped due to small sample ({len(subdf)}).')
-            continue
-        report_lines.append('=' * 80)
-        report_lines.append(f'Subset: {subset_name}')
-        report_lines.append(f'Total rows: {len(subdf)}')
-        report_lines.append(f'Longer wins rate: {subdf["longer_wins"].mean():.4f}')
-        report_lines.append(f'A longer rate: {subdf["longer_a"].mean():.4f}')
-
-        included = [c for c in confounders if c in subdf.columns and subdf[c].nunique(dropna=True) > 1]
-        if not included:
-            report_lines.append('  No variable-confounders available for this subset.')
-            continue
-
-        model_a = fit_logistic_model(subdf[['longer_a']], subdf['winner_a'])
-        summary_a = logistic_summary(model_a, 'longer_a')
-        if summary_a is not None:
-            report_lines.append('  Model A (longer_a only):')
-            report_lines.append(f'    coef={summary_a["coef"]:.4f}, OR={summary_a["or"]:.4f}, p={summary_a["p"]:.4f}, R2={summary_a["pseudo_r2"]:.4f}')
-
-        X = subdf[['longer_a'] + included].copy()
-        X[included] = X[included].astype(float)
-        model_b = fit_logistic_model(X, subdf['winner_a'])
-        summary_b = logistic_summary(model_b, 'longer_a')
-        if summary_b is not None:
-            report_lines.append('  Model B (longer_a + confounders):')
-            report_lines.append(f'    coef={summary_b["coef"]:.4f}, OR={summary_b["or"]:.4f}, p={summary_b["p"]:.4f}, R2={summary_b["pseudo_r2"]:.4f}')
-
-        match_res = propensity_score_matching(subdf, included, treatment='longer_a')
-        if match_res is not None:
-            report_lines.append('  Matching result (longer_a treated vs control):')
-            report_lines.append(f'    matched treated count: {match_res["n_treated"]}')
-            report_lines.append(f'    treated winner_a rate: {match_res["treated_rate"]:.4f}')
-            report_lines.append(f'    control winner_a rate: {match_res["control_rate"]:.4f}')
-            report_lines.append(f'    ATE: {match_res["average_treatment_effect"]:.4f}')
-            report_lines.append(f'    mean propensity distance: {match_res["mean_distance"]:.4f}')
-        else:
-            report_lines.append('  Matching failed or no valid matched sample.')
-
-        ipw_res = ipw_estimate(subdf, included, treatment='longer_a')
-        if ipw_res is not None:
-            report_lines.append('  IPW result:')
-            report_lines.append(f'    weighted treated rate: {ipw_res["weighted_treated_rate"]:.4f}')
-            report_lines.append(f'    weighted control rate: {ipw_res["weighted_control_rate"]:.4f}')
-            report_lines.append(f'    IPW effect: {ipw_res["ipw_effect"]:.4f}')
-        report_lines.append('')
-
-    out_path = Path(root) / 'Reports' / 'R17_length_effect_robust_report.txt'
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, 'w', encoding='utf-8') as f:
-        f.write('\n'.join(report_lines))
-
-    print('Report saved to:', out_path)
-    return out_path
+def _configure_plot_style() -> None:
+    """配置论文图表的全局样式。"""
+    plt.rcParams["font.sans-serif"] = ["SimHei", "Microsoft YaHei", "Arial Unicode MS", "DejaVu Sans"]
+    plt.rcParams["axes.unicode_minus"] = False
+    plt.style.use("seaborn-v0_8-darkgrid")
 
 
-if __name__ == '__main__':
-    render_report()
+def plot_length_robust_forest(summary_df: pd.DataFrame, picture_path: Path) -> None:
+    """绘制调整 OR 与 IPW ATE 的双面板森林图。"""
+    if summary_df.empty:
+        return
+
+    plot_df = summary_df.dropna(subset=["adjusted_or", "ipw_ate"]).copy()
+    if plot_df.empty:
+        return
+
+    _configure_plot_style()
+    plot_df = plot_df.sort_values("adjusted_or", ascending=True).reset_index(drop=True)
+    y_pos = np.arange(len(plot_df))
+    colors = ["#0f766e" if subset == "全量" else "#2563eb" for subset in plot_df["subset"]]
+    y_labels = plot_df["subset"].replace(SUBSET_LABELS_EN)
+
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=(15, max(7, len(plot_df) * 0.42)),
+        sharey=True,
+        gridspec_kw={"width_ratios": [1.15, 1.0]},
+    )
+
+    or_xerr = np.vstack([
+        plot_df["adjusted_or"] - plot_df["adjusted_or_ci_low"],
+        plot_df["adjusted_or_ci_high"] - plot_df["adjusted_or"],
+    ])
+    axes[0].errorbar(
+        plot_df["adjusted_or"],
+        y_pos,
+        xerr=or_xerr,
+        fmt="none",
+        ecolor="#94a3b8",
+        elinewidth=2,
+        capsize=3,
+        zorder=1,
+    )
+    axes[0].scatter(plot_df["adjusted_or"], y_pos, s=65, c=colors, zorder=3)
+    axes[0].axvline(1.0, color="#6b7280", linestyle="--", linewidth=1.2)
+    axes[0].set_xlabel("Adjusted odds ratio")
+    axes[0].set_title("Adjusted logistic model")
+
+    ate_xerr = np.vstack([
+        plot_df["ipw_ate"] - plot_df["ipw_ci_low"],
+        plot_df["ipw_ci_high"] - plot_df["ipw_ate"],
+    ])
+    axes[1].errorbar(
+        plot_df["ipw_ate"],
+        y_pos,
+        xerr=ate_xerr,
+        fmt="none",
+        ecolor="#cbd5e1",
+        elinewidth=2,
+        capsize=3,
+        zorder=1,
+    )
+    axes[1].scatter(plot_df["ipw_ate"], y_pos, s=65, c=colors, zorder=3)
+    axes[1].axvline(0.0, color="#6b7280", linestyle="--", linewidth=1.2)
+    axes[1].set_xlabel("IPW ATE")
+    axes[1].set_title("Stabilized IPW")
+
+    axes[0].set_yticks(y_pos)
+    axes[0].set_yticklabels(y_labels)
+    axes[1].set_yticks(y_pos)
+    axes[1].tick_params(axis="y", labelleft=False)
+
+    fig.suptitle("C19 Length Robustness")
+    fig.tight_layout()
+    picture_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(picture_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+
+def run_length_effect_robust(
+    file_path: Path | str | None = None,
+    report_dir: Path | str | None = None,
+    table_dir: Path | str | None = None,
+    picture_dir: Path | str | None = None,
+    bootstrap_n: int = 30,
+    seed: int = 42,
+) -> dict[str, Path]:
+    """执行完整的 R17 稳健性分析。"""
+    root = Path.cwd()
+    if report_dir is None:
+        report_path = get_report_path(root)
+    else:
+        report_path = Path(report_dir) / "R17_length_effect_robust_report.txt"
+
+    if table_dir is None:
+        table_path = get_table_path(root)
+    else:
+        table_path = Path(table_dir) / "T14_length_robust_summary.csv"
+
+    if picture_dir is None:
+        picture_path = get_picture_path(root)
+    else:
+        picture_path = Path(picture_dir) / "P16_length_robust_forest.png"
+
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    table_path.parent.mkdir(parents=True, exist_ok=True)
+    picture_path.parent.mkdir(parents=True, exist_ok=True)
+
+    print("=" * 80)
+    print("1/3 读取全量数据并构造模型级统计量")
+    print("=" * 80)
+    global_path = file_path if file_path is not None else None
+    df_global = load_data_global(global_path)
+    model_stats = build_model_stats(df_global)
+    subset_paths = get_subset_paths(root)
+
+    report_lines: list[str] = []
+    report_lines.append("=" * 80)
+    report_lines.append("长度效应稳健性分析报告（R17）")
+    report_lines.append("=" * 80)
+    report_lines.append("")
+    report_lines.append("【方法】")
+    report_lines.append("  - 处理变量：longer_a（A 是否更长）")
+    report_lines.append("  - 结果变量：winner_a（A 是否获胜）")
+    report_lines.append("  - 稳健性方法：调整逻辑回归 + 稳定化 IPW")
+    report_lines.append("  - 长度平局行已剔除")
+    report_lines.append("")
+
+    summary_rows: list[dict[str, float]] = []
+
+    print("=" * 80)
+    print("2/3 按子集执行稳健性分析")
+    print("=" * 80)
+    for subset_name, path in subset_paths.items():
+        print(f"分析子集：{subset_name}")
+        subset_df = load_subset(path, model_stats)
+        block_lines, summary_row = analyze_subset(
+            subset_name=subset_name,
+            df=subset_df,
+            bootstrap_n=bootstrap_n,
+            seed=seed,
+        )
+        report_lines.extend(block_lines)
+        if summary_row is not None:
+            summary_rows.append(summary_row)
+
+    summary_df = pd.DataFrame(summary_rows)
+    if not summary_df.empty:
+        summary_df = summary_df.sort_values("adjusted_or", ascending=False)
+        summary_df.to_csv(table_path, index=False, encoding="utf-8-sig")
+        plot_length_robust_forest(summary_df, picture_path)
+
+    report_lines.append("")
+    report_lines.append("=" * 80)
+    report_lines.append("3/3 汇总结论")
+    report_lines.append("=" * 80)
+    if not summary_df.empty:
+        full_row = summary_df[summary_df["subset"] == "全量"]
+        if not full_row.empty:
+            row = full_row.iloc[0]
+            report_lines.append(
+                f"全量样本：调整 OR={row['adjusted_or']:.4f}，"
+                f"IPW ATE={row['ipw_ate']:.4f}，"
+                f"95% CI [{row['ipw_ci_low']:.4f}, {row['ipw_ci_high']:.4f}]"
+            )
+        report_lines.append("解释：若调整 OR 仍 > 1 且 IPW CI 不跨 0，则说明长度优势在处理效应视角下依旧稳健。")
+    else:
+        report_lines.append("无可用子集结果。")
+
+    report_lines.append("")
+    report_lines.append("=" * 80)
+    report_lines.append("任务完成！")
+    report_lines.append("=" * 80)
+    report_path.write_text("\n".join(report_lines), encoding="utf-8")
+    print(report_path.read_text(encoding="utf-8")[:1200])
+    return {"report": report_path, "table": table_path, "picture": picture_path}
+
+
+def main() -> None:
+    """命令行入口。"""
+    parser = argparse.ArgumentParser(description="运行长度效应稳健性分析（R17）。")
+    parser.add_argument("--bootstrap", type=int, default=30, help="IPW bootstrap 次数，默认 30")
+    parser.add_argument("--seed", type=int, default=42, help="随机种子")
+    args = parser.parse_args()
+
+    run_length_effect_robust(
+        bootstrap_n=args.bootstrap,
+        seed=args.seed,
+    )
+
+
+if __name__ == "__main__":
+    main()

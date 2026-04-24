@@ -1,20 +1,104 @@
-# MUC-QMJH 数据分析项目总结报告
+# MUC-QMJH 数据分析研究仓库
 
-**项目版本**: v1.3  
-**更新时间**: 2026-04-10  
-**状态**: 净效应分析完成（C18/R16）；稳健性检验阶段
+**项目版本**: v1.5  
+**更新时间**: 2026-04-15  
+**状态**: 主分析链完成（C18–C22：净效应、双稳健性链、匹配诊断、SEM 全部完成）
+
+本 README 现在同时承担两项职责：
+
+- 作为 GitHub 公开仓库首页，说明项目定位、安装方式、许可边界和引用方式
+- 作为项目技术总览，汇总数据流、脚本结构、核心产物和当前结论
+
+---
+
+## GitHub 仓库定位
+
+本仓库是一个研究型 GitHub Repo，围绕 LLM 人类偏好数据中的长度偏好和格式偏好开展可复现分析。仓库当前主要包含：
+
+- 自研分析脚本与 Notebook
+- 自撰写方法说明和教学材料
+- 研究报告、表格和图片产物
+- 数据处理流程说明与复现入口
+
+本仓库不以“直接再分发第三方原始数据”为目标。若你要复现结果，应先确认上游数据许可，并按说明自行放置数据文件。
+
+## 快速开始
+
+### 1. 环境准备
+
+推荐 Python 3.10 及以上版本，并在仓库根目录安装依赖：
+
+```bash
+pip install -r requirements.txt
+```
+
+若需要运行全集成 Notebook，还建议保留 Jupyter 环境。
+
+### 2. 数据准备
+
+本仓库默认不承诺对第三方数据作统一再分发。请根据上游数据来源自行准备原始 parquet 分片，并放置到 README 与脚本约定的目录结构中。
+
+### 3. 运行方式
+
+所有脚本默认在仓库根目录执行，例如：
+
+```bash
+python Codes/C12_optimize_data.py
+python Codes/C13_divide_subset.py
+python Codes/C16_length_test.py
+```
+
+整体流程大体为：
+
+1. C01-C02 验证与整合原始数据
+2. C03-C11 检查字段结构与异常
+3. C12 清洗和优化数据
+4. C13 划分 20 个研究子集
+5. C14-C22 完成描述统计、显著性检验、净效应、稳健性和 SEM
+
+## 许可、数据与引用
+
+### 代码许可
+
+除另有说明外，自研代码采用 [Apache-2.0](./LICENSE) 发布。
+
+### 文档许可
+
+除另有说明外，自研文档和教学材料采用 [CC BY 4.0](./LICENSE-docs.md) 共享。
+
+### 数据边界
+
+Data/ 下的原始数据、缓存数据和可能受上游条款约束的派生数据，不受根目录代码许可证统一授权。使用前请先阅读 [LICENSE_POLICY.md](./LICENSE_POLICY.md)。
+
+### 引用方式
+
+若你在论文、课程、讲义或派生软件中使用本仓库，请优先引用 [CITATION.cff](./CITATION.cff)。在正式公开到 GitHub 前，请维护者补充实际仓库 URL 和维护者信息。
+
+## 治理文件
+
+公开仓库的协作、引用和合规说明已拆分到以下文件：
+
+- [CONTRIBUTING.md](./CONTRIBUTING.md)
+- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
+- [SECURITY.md](./SECURITY.md)
+- [CHANGELOG.md](./CHANGELOG.md)
+- [LICENSE_POLICY.md](./LICENSE_POLICY.md)
 
 ---
 
 ## 目录
 
-1. [项目概述](#项目概述)
-2. [现有成果](#现有成果)
-3. [数据流向](#数据流向)
-4. [代码架构](#代码架构)
-5. [代码风格规范](#代码风格规范)
-6. [脚本详解](#脚本详解)
-7. [关键设计模式](#关键设计模式)
+1. [GitHub 仓库定位](#github-仓库定位)
+2. [快速开始](#快速开始)
+3. [许可、数据与引用](#许可数据与引用)
+4. [治理文件](#治理文件)
+5. [项目概述](#项目概述)
+6. [现有成果](#现有成果)
+7. [数据流向](#数据流向)
+8. [代码架构](#代码架构)
+9. [代码风格规范](#代码风格规范)
+10. [脚本详解](#脚本详解)
+11. [关键设计模式](#关键设计模式)
 
 ---
 
@@ -26,11 +110,11 @@
 - 验证原始数据完整性和一致性
 - 清洗并优化数据集结构
 - 按任务类型进行数据划分
-- 支持后续的深度分析和模型训练
+- 量化长度/格式偏好、控制混淆，并通过 SEM 描述因果路径
 
 **数据规模**：
 - 原始行数：135,634 条记录
-- 清洗后：108,280 条记录（保留率 79.83%）
+- 清洗后：108,171 条记录（保留率 79.75%）
 - 涉及模型数：53 种
 - 语言种类：126 种
 
@@ -54,14 +138,23 @@
 | C10 | verify_token_correction | 验证Token数一致性 | R07_token_report.txt |
 | C11 | touch_category_tag | 分析分类标签 | R08_category_tag_report.txt |
 | C12 | optimize_data | 数据清洗和优化 | R09_optimization_report.txt + optimized_data.parquet |
-| C13 | divide_subset | 按分类划分数据集 | R10_division_report.txt + 18个子集文件 |
+| C13 | divide_subset | 按分类划分数据集 | R10_division_report.txt + 20个子集文件 |
 | C14 | visualize_length_preference | 长度偏好可视化（差值分析）| R11 + T01 + P05 |
 | C15 | visualize_format_preference | 格式偏好可视化（新增格式密度）| R12 + T03-T08 + P06-P10 |
 | C16 | length_test | Wilcoxon 长度偏好检验 + Bonferroni + Bootstrap CI + Cohen's d | R13 ✅ |
 | C17 | format_test | 格式偏好检验（Wilcoxon + 密度辅助 + 卡方）| R14 ✅ |
 | C18 | pure_effect | 净效应嵌套逻辑回归（长度 M0→M3；格式 F0→F3；C13 子集）| R16 ✅ |
-| C19 | length_effect_robust | IPW 稳健性检验 | R17 ⏳ |
-| C20 | enhanced_matching_diagnostics | 匹配诊断 + Within-pair Wilcoxon | R18 ⏳ |
+| C19 | length_effect_robust | 调整 Logit + 稳定化 IPW + bootstrap CI | R17 + T14 ✅ |
+| C20 | format_effect_robust | 格式效应稳健性分析（调整 Logit + 稳定化 IPW + bootstrap CI） | R18 + T15 ✅ |
+| C21 | enhanced_matching_diagnostics | PSM 匹配诊断 + SMD 平衡性 + 配对 Wilcoxon | R19 + T16-T17 ✅ |
+| C22 | sem_analysis | 结构方程模型（主模型/扩展模型 + bootstrap CI + 路径图）| R20 + T09-T13 + P11 ✅ |
+
+### 最新核心结论
+
+- **长度偏好在控制混淆后仍然稳健存在**：C18 全量净效应 OR=1.355；C19 全量调整 OR=1.910，IPW ATE=0.149，95% CI [0.135, 0.161]。
+- **标题/粗体格式偏好在稳健性分析中仍成立，列表仅保留为敏感性变量**：C20 全量标题密度调整 OR=1.132，IPW ATE=0.028；粗体密度调整 OR=1.106，IPW ATE=0.025；列表密度全量 IPW CI 跨 0，不写入主结论。
+- **匹配后长度结论仍成立**：C21 全量样本 mean|SMD| 从 0.250 降至 0.060，匹配后 ATE=0.160，配对 Wilcoxon 极显著。
+- **SEM 支持“长度 + 标题密度 + 粗体密度”并列作用于偏好**：C22 主模型拟合优度极高（CFI=0.9998，RMSEA=0.0030），三条直接路径 bootstrap CI 均不跨 0。
 
 ### 生成的数据文件
 
@@ -71,11 +164,11 @@ Data/
 ├── integrated_data/
 │   └── integrated_data.parquet          (135,634行 × 14列)
 ├── optimized_data/
-│   ├── optimized_data.parquet           (108,280行 × 31列)
+│   ├── optimized_data.parquet           (108,171行 × 32列)
 │   ├── creative_writing_*.parquet       (按分类)
 │   ├── if_*.parquet                     (按分类)
 │   ├── math_*.parquet                   (按分类)
-│   └── ...                              (18个子集)
+│   └── ...                              (20个子集)
 ├── length_data/
 │   └── length_data.parquet              (长度分析专用)
 └── format_data/
@@ -95,7 +188,13 @@ Reports/
 ├── R07_token_report.txt                 (Token一致性)
 ├── R08_category_tag_report.txt          (分类标签分析)
 ├── R09_optimization_report.txt          (清洗统计)
-└── R10_division_report.txt       (划分统计)
+├── R10_division_report.txt              (划分统计)
+├── R11-R14_*.txt                        (描述统计 + 显著性检验)
+├── R16_pure_effect_report.txt           (净效应分析)
+├── R17_length_effect_robust_report.txt  (长度稳健性)
+├── R18_format_effect_robust_report.txt  (格式稳健性)
+├── R19_enhanced_diagnostics_report.txt  (匹配诊断)
+└── R20_sem_analysis_report.txt          (SEM 报告)
 ```
 
 ---
@@ -139,7 +238,7 @@ writing  orders orders   subsets intersect data  data
 (6个)    (6个)  (6个)    (3个)    (3个)   (1个) (1个)
     
     ↓
-总计18个子集文件
+总计20个子集文件
 ```
 
 ---
@@ -183,12 +282,13 @@ writing  orders orders   subsets intersect data  data
 第六.五层：净效应分析 (C18，已完成)
   └─ C18: 嵌套逻辑回归（长度 M0→M3；格式 F0→F3；混淆比例；C13 子集）
 
-第七层：稳健性检验 (C19-C20，待执行)
-  ├─ C19: IPW 稳健性检验
-  └─ C20: 匹配质量诊断 + Within-pair Wilcoxon
+第七层：稳健性检验与匹配诊断 (C19-C21，已完成)
+    ├─ C19: 长度效应稳健性（调整 Logit + 稳定化 IPW + bootstrap CI）
+    ├─ C20: 格式效应稳健性（标题/粗体主分析，列表敏感性分析）
+    └─ C21: 匹配质量诊断 + SMD 平衡性 + Within-pair Wilcoxon
 
-第八层：因果推断 (C21，待编码)
-  └─ C21: SEM 路径分析（回复级中介变量）
+第八层：机制解释 (C22，已完成)
+    └─ C22: SEM 路径分析（主模型/扩展模型 + bootstrap CI + 路径图）
 ```
 
 ### 模块化设计
@@ -369,17 +469,17 @@ print("=" * 80)
 ```python
 原始数据形状: (135634, 14)
             ↓
-按qualification过滤: 108280行 (保留79.83%)
+按qualification过滤: 108171行 (保留79.75%)
             ↓
 对话扁平化: 提取turn_X_a_text, turn_X_b_text
             ↓
 元数据简化: 保留a_tokens, a_header_count等关键字段
             ↓
-标签降维: creative_writing_bool, if_bool, math_bool
+标签降维: creative_writing_bool, if_bool, math_bool, code_bool
             ↓
 维度提取: 7个标准评估维度
             ↓
-最终形状: (108280, 31)
+最终形状: (108171, 32)
 ```
 
 **两个独立输出路径**：
@@ -388,31 +488,36 @@ print("=" * 80)
 
 ### C13: divide_subset（数据分割脚本）
 
-**划分维度**：3个分类布尔值
+**划分维度**：4个分类布尔值
 ```python
-creative_writing_bool  | if_bool | math_bool
-─────────────────────────────────────────
-      T/F              |  T/F    |   T/F
+creative_writing_bool  | if_bool | math_bool | code_bool
+────────────────────────────────────────────────────────
+        T/F              |  T/F    |   T/F     |   T/F
 ```
 
-**18个子集的组织**：
+**20个子集的组织**：
 ```
-1. 单一分类（6个）
-   - creative_writing_true/false
-   - if_true/false
-   - math_true/false
+1. 单一分类（4个，含该类，允许重叠）
+    - creative_writing_true
+    - if_true
+    - math_true
+    - code_true
 
-2. 纯净子集（3个）
-   - only_creative_writing
-   - only_if
-   - only_math
+2. 纯净子集（4个）
+    - only_cw
+    - only_if
+    - only_math
+    - only_code
 
-3. 二分类交叉（3个）
-   - creative_writing_if
-   - creative_writing_math
-   - if_math
+3. 二分类交叉（6个）
+    - cw_if, cw_math, cw_code
+    - if_math, if_code, math_code
 
-4. 特殊子集（2个）
+4. 三分类交叉（4个）
+    - cw_if_math, cw_if_code
+    - cw_math_code, if_math_code
+
+5. 特殊子集（2个）
    - all_categories
    - no_category
 
@@ -574,26 +679,20 @@ turn_num = i // 2 + 1
 
 ## 后续开发建议
 
-### 当前优先（Phase 1 — 修复命名冲突）
+### 当前优先
 
-- [ ] 修复 C16–C21 输出路径 R 编号冲突（详见 References/current_report.md 第八节）
+- [ ] 为 C13 增加 `lang_en` 英语子集，检验多语言污染对主结论的影响
+- [ ] 将 `no_category` 进一步细分为 `no_category_code` / `no_category_natural`
 
-### 近期（Phase 2 — 统计检验）
+### 近期扩展
 
-- [ ] 运行 C16 → R13_wilcoxon_length_test_report.txt
-- [ ] 运行 C17 → R14_format_test_report.txt
-- [ ] 运行 C18 → R15_effect_size_report.txt
+- [ ] 在 C21 中加入新的回复级中介：步骤数、代码块数、引用数、段落数
+- [ ] 对 C19/C20/C21 增加英语子集附录结果，评估结论跨语言稳定性
 
-### 中期（Phase 3 — 混淆控制）
+### 论文整合
 
-- [ ] 运行 C19 → R16_pure_effect_report.txt
-- [ ] 运行 C20 → R17_length_effect_robust_report.txt
-- [ ] 运行 C21 → R18_enhanced_diagnostics_report.txt
-
-### 长期（Phase 4 — SEM 建模）
-
-- [ ] 编写 C22_sem_path_analysis.py（semopy）
-- [ ] 确认 SEM 中介变量操作化方案（感知层可读性 vs 现有质量维度）
+- [ ] 将 R13–R19 收束为论文“结果”主表和附录表
+- [ ] 依据 R19 路径结果，重写“长度与格式偏好机制”章节
 
 ---
 
@@ -606,11 +705,11 @@ turn_num = i // 2 + 1
 
 **相关数据**：
 - 整合数据：`Data/integrated_data/integrated_data.parquet` (135,634行)
-- 优化数据：`Data/optimized_data/optimized_data.parquet` (108,280行)
-- 子集数据：`Data/optimized_data/*.parquet` (18个文件)
+- 优化数据：`Data/optimized_data/optimized_data.parquet` (108,171行)
+- 子集数据：`Data/optimized_data/*.parquet` (20个文件)
 
 ---
 
-**报告生成时间**: 2026-04-07  
-**报告作者**: GitHub Copilot  
-**项目所有者**: MUC-QMJH Team
+**README 最近整理时间**: 2026-04-15  
+**仓库维护方**: MUC-QMJH Team  
+**机构归属**: Minzu University of China（公开发布前建议核对正式英文署名）

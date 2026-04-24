@@ -39,6 +39,10 @@
 
 输出：
   Reports/R16_pure_effect_report.txt
+    Tables/T20_pure_length_net_effect_summary.csv
+    Tables/T21_pure_format_net_effect_summary.csv
+    Pictures/P14_length_confounding_attenuation.png
+    Pictures/P15_format_net_effect_heatmaps.png
 
 参考：
   References/M03_confounding_analysis.md
@@ -47,9 +51,11 @@
 import warnings
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
+from matplotlib.colors import TwoSlopeNorm
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
 
@@ -65,6 +71,28 @@ def get_report_path(root: Path | str | None = None) -> Path:
     if root is None:
         root = Path.cwd()
     return Path(root) / "Reports" / "R16_pure_effect_report.txt"
+
+
+def get_table_paths(root: Path | str | None = None) -> dict[str, Path]:
+    """返回 C18 汇总表输出路径。"""
+    if root is None:
+        root = Path.cwd()
+    table_dir = Path(root) / "Tables"
+    return {
+        "length": table_dir / "T20_pure_length_net_effect_summary.csv",
+        "format": table_dir / "T21_pure_format_net_effect_summary.csv",
+    }
+
+
+def get_picture_paths(root: Path | str | None = None) -> dict[str, Path]:
+    """返回 C18 图表输出路径。"""
+    if root is None:
+        root = Path.cwd()
+    picture_dir = Path(root) / "Pictures"
+    return {
+        "length": picture_dir / "P14_length_confounding_attenuation.png",
+        "format": picture_dir / "P15_format_net_effect_heatmaps.png",
+    }
 
 
 def get_subset_paths(root: Path | str | None = None) -> dict[str, Path]:
@@ -85,12 +113,44 @@ def get_subset_paths(root: Path | str | None = None) -> dict[str, Path]:
         "仅数学":         d / "only_math_data.parquet",
         "仅代码":         d / "only_code_data.parquet",
         "创意+指令":      d / "cw_if_data.parquet",
+        "创意+数学":      d / "cw_math_data.parquet",
         "创意+代码":      d / "cw_code_data.parquet",
         "指令+数学":      d / "if_math_data.parquet",
         "指令+代码":      d / "if_code_data.parquet",
         "数学+代码":      d / "math_code_data.parquet",
+        "创意+指令+数学": d / "cw_if_math_data.parquet",
+        "创意+指令+代码": d / "cw_if_code_data.parquet",
+        "创意+数学+代码": d / "cw_math_code_data.parquet",
         "指令+数学+代码": d / "if_math_code_data.parquet",
+        "四类全含":       d / "all_categories_data.parquet",
     }
+
+
+SUBSET_LABELS_EN = {
+    "全量": "Full",
+    "无类别": "No category",
+    "仅创意写作": "CW only",
+    "仅指令遵循": "IF only",
+    "仅数学": "Math only",
+    "仅代码": "Code only",
+    "创意+指令": "CW + IF",
+    "创意+数学": "CW + Math",
+    "创意+代码": "CW + Code",
+    "指令+数学": "IF + Math",
+    "指令+代码": "IF + Code",
+    "数学+代码": "Math + Code",
+    "创意+指令+数学": "CW + IF + Math",
+    "创意+指令+代码": "CW + IF + Code",
+    "创意+数学+代码": "CW + Math + Code",
+    "指令+数学+代码": "IF + Math + Code",
+    "四类全含": "All four",
+}
+
+FORMAT_LABELS_EN = {
+    "标题密度差": "Header density",
+    "列表密度差": "List density",
+    "粗体密度差": "Bold density",
+}
 
 
 # ── 数据加载与特征构建 ────────────────────────────────────────────────────────
@@ -702,12 +762,163 @@ def _render_format_summary(results: list[dict | None], report_lines: list[str]) 
         report_lines.append(row)
 
 
+def _configure_plot_style() -> None:
+    """配置论文图表的全局样式。"""
+    plt.rcParams["font.sans-serif"] = ["SimHei", "Microsoft YaHei", "Arial Unicode MS", "DejaVu Sans"]
+    plt.rcParams["axes.unicode_minus"] = False
+    plt.style.use("seaborn-v0_8-darkgrid")
+
+
+def build_length_summary_df(results: list[dict | None]) -> pd.DataFrame:
+    """将长度嵌套模型结果整理为结构化表格。"""
+    rows = [r for r in results if r is not None]
+    if not rows:
+        return pd.DataFrame()
+    summary_df = pd.DataFrame(rows)
+    return summary_df.sort_values("or3", ascending=False, na_position="last").reset_index(drop=True)
+
+
+def build_format_summary_df(results: list[dict | None]) -> pd.DataFrame:
+    """将格式嵌套模型结果展开为长表结构。"""
+    rows: list[dict[str, float | str]] = []
+    for result in results:
+        if result is None:
+            continue
+        for feature in FORMAT_DENSITY_VARS:
+            rows.append({
+                "subset": result["subset"],
+                "n": result["n"],
+                "feature": feature,
+                "feature_label": FORMAT_DENSITY_LABELS[feature],
+                "or_f0": result["or_f0"].get(feature, np.nan),
+                "or_f3": result["or_f3"].get(feature, np.nan),
+                "confound_pct": result["confound_pcts"].get(feature, np.nan),
+                "r2_f0": result["r2_f0"],
+                "r2_f3": result["r2_f3"],
+            })
+    if not rows:
+        return pd.DataFrame()
+
+    summary_df = pd.DataFrame(rows)
+    header_df = summary_df[summary_df["feature"] == "header_density_diff"].copy()
+    subset_order = header_df.sort_values("or_f3", ascending=False, na_position="last")["subset"].tolist()
+    summary_df["subset"] = pd.Categorical(summary_df["subset"], categories=subset_order, ordered=True)
+    return summary_df.sort_values(["subset", "feature"]).reset_index(drop=True)
+
+
+def plot_length_attenuation(length_df: pd.DataFrame, picture_path: Path) -> None:
+    """绘制长度粗效应到净效应的 OR 衰减图。"""
+    plot_df = length_df.dropna(subset=["or0", "or3"]).copy()
+    if plot_df.empty:
+        return
+
+    _configure_plot_style()
+    plot_df = plot_df.sort_values("or3", ascending=True).reset_index(drop=True)
+    y_pos = np.arange(len(plot_df))
+    y_labels = plot_df["subset"].replace(SUBSET_LABELS_EN)
+
+    fig, ax = plt.subplots(figsize=(12, max(7, len(plot_df) * 0.45)))
+    for idx, row in plot_df.iterrows():
+        line_color = "#b3b3b3" if row["subset"] != "全量" else "#1f2937"
+        ax.hlines(y=idx, xmin=row["or3"], xmax=row["or0"], color=line_color, linewidth=2.0, alpha=0.85)
+
+    crude_color = "#d97706"
+    net_color = "#0f766e"
+    marker_size = np.clip(np.sqrt(plot_df["n"]) * 1.6, 36, 180)
+    ax.scatter(plot_df["or0"], y_pos, s=marker_size, color=crude_color, label="Crude OR (M0)", zorder=3)
+    ax.scatter(plot_df["or3"], y_pos, s=marker_size, color=net_color, label="Net OR (M3)", zorder=4)
+
+    or_values = plot_df[["or0", "or3"]].to_numpy(dtype=float)
+    confound_x = float(np.nanmax(or_values) + 0.08)
+    for idx, row in plot_df.iterrows():
+        confound_pct = row["confound_pct"]
+        label = f"{confound_pct:.0%}" if not np.isnan(confound_pct) else "N/A"
+        ax.text(confound_x, idx, label, va="center", ha="left", fontsize=9, color="#374151")
+
+    ax.axvline(1.0, color="#6b7280", linestyle="--", linewidth=1.2)
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(y_labels)
+    ax.set_xlabel("Odds ratio")
+    ax.set_title("C18 Length Net Effect Attenuation")
+    ax.text(confound_x, len(plot_df) - 0.35, "Confounding share", ha="left", va="bottom", fontsize=10, color="#111827")
+    ax.legend(loc="lower right")
+    ax.set_xlim(left=min(0.9, float(np.nanmin(or_values)) - 0.05), right=confound_x + 0.18)
+    fig.tight_layout()
+    picture_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(picture_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_format_heatmaps(format_df: pd.DataFrame, picture_path: Path) -> None:
+    """绘制格式净效应 OR 与混淆比例热图。"""
+    if format_df.empty:
+        return
+
+    _configure_plot_style()
+    order = list(dict.fromkeys(format_df["subset"].astype(str).tolist()))
+    or_matrix = format_df.pivot(index="subset", columns="feature_label", values="or_f3").reindex(order)
+    confound_matrix = format_df.pivot(index="subset", columns="feature_label", values="confound_pct").reindex(order)
+    or_matrix.index = [SUBSET_LABELS_EN.get(idx, idx) for idx in or_matrix.index]
+    confound_matrix.index = [SUBSET_LABELS_EN.get(idx, idx) for idx in confound_matrix.index]
+    or_matrix.columns = [FORMAT_LABELS_EN.get(col, col) for col in or_matrix.columns]
+    confound_matrix.columns = [FORMAT_LABELS_EN.get(col, col) for col in confound_matrix.columns]
+
+    fig, axes = plt.subplots(1, 2, figsize=(15, max(7, len(or_matrix) * 0.42)), constrained_layout=True)
+
+    finite_or = or_matrix.to_numpy(dtype=float)
+    finite_or = finite_or[np.isfinite(finite_or)]
+    if finite_or.size == 0:
+        plt.close(fig)
+        return
+    norm = TwoSlopeNorm(vmin=float(finite_or.min()), vcenter=1.0, vmax=float(finite_or.max()))
+    im_or = axes[0].imshow(or_matrix.to_numpy(dtype=float), aspect="auto", cmap="RdYlBu_r", norm=norm)
+    axes[0].set_title("Net odds ratio (F3)")
+
+    confound_values = confound_matrix.to_numpy(dtype=float)
+    finite_confound = confound_values[np.isfinite(confound_values)]
+    confound_vmax = float(np.nanmax(finite_confound)) if finite_confound.size else 1.0
+    confound_vmax = max(confound_vmax, 0.5)
+    im_conf = axes[1].imshow(
+        confound_values,
+        aspect="auto",
+        cmap="YlOrRd",
+        vmin=0.0,
+        vmax=confound_vmax,
+    )
+    axes[1].set_title("Confounding share")
+
+    for ax in axes:
+        ax.set_xticks(np.arange(len(or_matrix.columns)))
+        ax.set_xticklabels(or_matrix.columns)
+        ax.set_yticks(np.arange(len(or_matrix.index)))
+        ax.set_yticklabels(or_matrix.index)
+        ax.tick_params(axis="x", rotation=0)
+
+    for i in range(or_matrix.shape[0]):
+        for j in range(or_matrix.shape[1]):
+            value = or_matrix.iat[i, j]
+            if not np.isnan(value):
+                axes[0].text(j, i, f"{value:.2f}", ha="center", va="center", fontsize=9, color="#111827")
+            confound = confound_matrix.iat[i, j]
+            if not np.isnan(confound):
+                axes[1].text(j, i, f"{confound:.0%}", ha="center", va="center", fontsize=9, color="#111827")
+
+    fig.colorbar(im_or, ax=axes[0], fraction=0.046, pad=0.04)
+    fig.colorbar(im_conf, ax=axes[1], fraction=0.046, pad=0.04)
+    fig.suptitle("C18 Format Net Effect Overview")
+    picture_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(picture_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+
 # ── 主流程 ────────────────────────────────────────────────────────────────────
 
 def run_pure_effect(
     file_path: Path | str | None = None,
     report_dir: Path | str | None = None,
-) -> None:
+    table_dir: Path | str | None = None,
+    picture_dir: Path | str | None = None,
+) -> dict[str, Path]:
     """
     主分析函数：加载全量数据计算模型统计量 → 逐子集读取 C13 文件 →
     运行长度与格式双系列嵌套逻辑回归 → 写报告。
@@ -715,12 +926,30 @@ def run_pure_effect(
     参数说明：
     - file_path  : optimized_data.parquet 路径（默认按 CWD 自动定位）
     - report_dir : 报告输出目录（默认按 CWD/Reports 定位）
+    - table_dir  : 汇总表输出目录（默认按 CWD/Tables 定位）
+    - picture_dir: 图片输出目录（默认按 CWD/Pictures 定位）
     """
     root        = Path.cwd()
     report_path = (
         Path(report_dir) / "R16_pure_effect_report.txt"
         if report_dir else get_report_path(root)
     )
+    if table_dir is None:
+        table_paths = get_table_paths(root)
+    else:
+        table_root = Path(table_dir)
+        table_paths = {
+            "length": table_root / "T20_pure_length_net_effect_summary.csv",
+            "format": table_root / "T21_pure_format_net_effect_summary.csv",
+        }
+    if picture_dir is None:
+        picture_paths = get_picture_paths(root)
+    else:
+        picture_root = Path(picture_dir)
+        picture_paths = {
+            "length": picture_root / "P14_length_confounding_attenuation.png",
+            "format": picture_root / "P15_format_net_effect_heatmaps.png",
+        }
     subset_paths = get_subset_paths(root)
 
     report_lines: list[str] = []
@@ -799,6 +1028,17 @@ def run_pure_effect(
     _render_length_summary(len_results, report_lines)
     _render_format_summary(fmt_results, report_lines)
 
+    length_summary_df = build_length_summary_df(len_results)
+    format_summary_df = build_format_summary_df(fmt_results)
+    if not length_summary_df.empty:
+        table_paths["length"].parent.mkdir(parents=True, exist_ok=True)
+        length_summary_df.to_csv(table_paths["length"], index=False, encoding="utf-8-sig")
+        plot_length_attenuation(length_summary_df, picture_paths["length"])
+    if not format_summary_df.empty:
+        table_paths["format"].parent.mkdir(parents=True, exist_ok=True)
+        format_summary_df.to_csv(table_paths["format"], index=False, encoding="utf-8-sig")
+        plot_format_heatmaps(format_summary_df, picture_paths["format"])
+
     # ─ 写文件
     report_path.parent.mkdir(parents=True, exist_ok=True)
     with open(report_path, "w", encoding="utf-8") as f:
@@ -807,6 +1047,13 @@ def run_pure_effect(
     print(f"\n报告已写入：{report_path}")
     print("\n任务完成！")
     print("=" * 60)
+    return {
+        "report": report_path,
+        "length_table": table_paths["length"],
+        "format_table": table_paths["format"],
+        "length_picture": picture_paths["length"],
+        "format_picture": picture_paths["format"],
+    }
 
 
 if __name__ == "__main__":

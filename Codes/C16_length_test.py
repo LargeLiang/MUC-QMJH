@@ -15,9 +15,12 @@ C16_length_test
   Wilcoxon W、p 值（原始 + Bonferroni 校正）、rank-biserial r、效应分级
 
 数据流向：
-  Data/optimized_data/  →  Wilcoxon 检验  →  Reports/R13_wilcoxon_length_test_report.txt
+    Data/optimized_data/  →  Wilcoxon 检验  →  Reports/R13_wilcoxon_length_test_report.txt
+                                                                                            Tables/T18_length_wilcoxon_summary.csv
+                                                                                            Pictures/P12_length_wilcoxon_overview.png
 """
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -34,6 +37,27 @@ def get_data_dir(root: Path | str | None = None) -> Path:
     if root is None:
         return Path.cwd() / "Data" / "optimized_data"
     return Path(root) / "Data" / "optimized_data"
+
+
+def get_report_path(root: Path | str | None = None) -> Path:
+    """返回 R13 报告路径。"""
+    if root is None:
+        root = Path.cwd()
+    return Path(root) / "Reports" / "R13_wilcoxon_length_test_report.txt"
+
+
+def get_table_path(root: Path | str | None = None) -> Path:
+    """返回 C16 汇总表路径。"""
+    if root is None:
+        root = Path.cwd()
+    return Path(root) / "Tables" / "T18_length_wilcoxon_summary.csv"
+
+
+def get_picture_path(root: Path | str | None = None) -> Path:
+    """返回 C16 主图路径。"""
+    if root is None:
+        root = Path.cwd()
+    return Path(root) / "Pictures" / "P12_length_wilcoxon_overview.png"
 
 
 # ---------------------------------------------------------------------------
@@ -60,6 +84,26 @@ SUBSETS: List[tuple[str, str]] = [
     ("指令+数学+代码",   "if_math_code_data.parquet"),
     ("四类全含",         "all_categories_data.parquet"),
 ]
+
+SUBSET_LABELS_EN = {
+    "全量": "Full",
+    "无类别": "No category",
+    "仅创意写作": "CW only",
+    "仅指令遵循": "IF only",
+    "仅数学": "Math only",
+    "仅代码": "Code only",
+    "创意+指令": "CW + IF",
+    "创意+数学": "CW + Math",
+    "创意+代码": "CW + Code",
+    "指令+数学": "IF + Math",
+    "指令+代码": "IF + Code",
+    "数学+代码": "Math + Code",
+    "创意+指令+数学": "CW + IF + Math",
+    "创意+指令+代码": "CW + IF + Code",
+    "创意+数学+代码": "CW + Math + Code",
+    "指令+数学+代码": "IF + Math + Code",
+    "四类全含": "All four",
+}
 
 # 每个子集有效对数的最小阈值（低于此数则跳过）
 MIN_PAIRS = 30
@@ -206,19 +250,111 @@ def run_one_subset(label: str, df: pd.DataFrame) -> Optional[Dict]:
     return result
 
 
+def _configure_plot_style() -> None:
+    """配置论文图表的全局样式。"""
+    plt.rcParams["font.sans-serif"] = ["SimHei", "Microsoft YaHei", "Arial Unicode MS", "DejaVu Sans"]
+    plt.rcParams["axes.unicode_minus"] = False
+    plt.style.use("seaborn-v0_8-darkgrid")
+
+
+def build_summary_df(results: List[Dict]) -> pd.DataFrame:
+    """将检验结果整理为结构化汇总表。"""
+    if not results:
+        return pd.DataFrame()
+    summary_df = pd.DataFrame(results)
+    return summary_df.sort_values("rank_biserial_r", ascending=False, na_position="last").reset_index(drop=True)
+
+
+def plot_length_overview(summary_df: pd.DataFrame, picture_path: Path) -> None:
+    """绘制中位长度差 CI 与 rank-biserial r 的双面板总览图。"""
+    if summary_df.empty:
+        return
+
+    _configure_plot_style()
+    plot_df = summary_df.sort_values("rank_biserial_r", ascending=True).reset_index(drop=True)
+    y_pos = np.arange(len(plot_df))
+    colors = ["#0f766e" if sig else "#9ca3af" for sig in plot_df["significant"]]
+    marker_size = np.clip(np.sqrt(plot_df["n_pairs"]) * 1.6, 36, 180)
+    y_labels = plot_df["label"].replace(SUBSET_LABELS_EN)
+
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=(15, max(7, len(plot_df) * 0.42)),
+        sharey=True,
+        gridspec_kw={"width_ratios": [1.35, 1.0]},
+    )
+
+    median_xerr = np.vstack([
+        plot_df["median_diff"] - plot_df["ci_low"],
+        plot_df["ci_high"] - plot_df["median_diff"],
+    ])
+    axes[0].errorbar(
+        plot_df["median_diff"],
+        y_pos,
+        xerr=median_xerr,
+        fmt="none",
+        ecolor="#94a3b8",
+        elinewidth=2,
+        capsize=3,
+        zorder=1,
+    )
+    axes[0].scatter(plot_df["median_diff"], y_pos, s=marker_size, c=colors, zorder=3)
+    axes[0].axvline(0, color="#6b7280", linestyle="--", linewidth=1.2)
+    axes[0].set_xlabel("Median length difference (tokens)")
+    axes[0].set_title("Bootstrap 95% CI")
+
+    axes[1].barh(y_pos, plot_df["rank_biserial_r"], color=colors, alpha=0.9)
+    axes[1].axvline(0, color="#6b7280", linestyle="--", linewidth=1.2)
+    axes[1].axvline(0.1, color="#cbd5e1", linestyle=":", linewidth=1.0)
+    axes[1].axvline(0.3, color="#cbd5e1", linestyle=":", linewidth=1.0)
+    axes[1].axvline(0.5, color="#cbd5e1", linestyle=":", linewidth=1.0)
+    axes[1].set_xlabel("rank-biserial r")
+    axes[1].set_title("Effect size")
+
+    axes[0].set_yticks(y_pos)
+    axes[0].set_yticklabels(y_labels)
+    axes[1].set_yticks(y_pos)
+    axes[1].tick_params(axis="y", labelleft=False)
+
+    for idx, row in plot_df.iterrows():
+        sig_mark = "*" if row["significant"] else ""
+        axes[1].text(
+            row["rank_biserial_r"] + 0.012,
+            idx,
+            f"{row['rank_biserial_r']:.2f}{sig_mark}",
+            va="center",
+            ha="left",
+            fontsize=9,
+            color="#111827",
+        )
+
+    fig.suptitle("C16 Length Preference Overview")
+    fig.tight_layout()
+    picture_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(picture_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+
 # ---------------------------------------------------------------------------
 # 主函数
 # ---------------------------------------------------------------------------
 
 def run_length_test(data_dir: Path | str | None = None,
-                    report_dir: Path | str | None = None) -> None:
+                    report_dir: Path | str | None = None,
+                    table_dir: Path | str | None = None,
+                    picture_dir: Path | str | None = None) -> dict[str, Path] | None:
     """
     对所有预定义子集执行长度偏好 Wilcoxon 符号秩检验并生成报告。
 
     参数说明：
     - data_dir：子集 parquet 文件目录（默认为 Data/optimized_data）
     - report_dir：报告保存目录（默认为 Reports）
+    - table_dir：汇总表保存目录（默认为 Tables）
+    - picture_dir：图片保存目录（默认为 Pictures）
     """
+
+    root = Path.cwd()
 
     if data_dir is None:
         data_dir = get_data_dir()
@@ -226,11 +362,23 @@ def run_length_test(data_dir: Path | str | None = None,
         data_dir = Path(data_dir)
 
     if report_dir is None:
-        report_dir = Path.cwd() / "Reports"
+        report_dir = get_report_path(root).parent
     else:
         report_dir = Path(report_dir)
 
+    if table_dir is None:
+        table_path = get_table_path(root)
+    else:
+        table_path = Path(table_dir) / "T18_length_wilcoxon_summary.csv"
+
+    if picture_dir is None:
+        picture_path = get_picture_path(root)
+    else:
+        picture_path = Path(picture_dir) / "P12_length_wilcoxon_overview.png"
+
     report_dir.mkdir(parents=True, exist_ok=True)
+    table_path.parent.mkdir(parents=True, exist_ok=True)
+    picture_path.parent.mkdir(parents=True, exist_ok=True)
 
     results: List[Dict] = []
 
@@ -263,6 +411,14 @@ def run_length_test(data_dir: Path | str | None = None,
         res["significant"] = adj_p < 0.05
 
     generate_report(results, k, report_dir)
+    summary_df = build_summary_df(results)
+    summary_df.to_csv(table_path, index=False, encoding="utf-8-sig")
+    plot_length_overview(summary_df, picture_path)
+    return {
+        "report": report_dir / "R13_wilcoxon_length_test_report.txt",
+        "table": table_path,
+        "picture": picture_path,
+    }
 
 
 # ---------------------------------------------------------------------------

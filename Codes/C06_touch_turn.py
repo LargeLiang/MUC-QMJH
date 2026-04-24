@@ -15,7 +15,6 @@ C06_touch_turn
 import pandas as pd
 from pathlib import Path
 from collections import Counter
-from typing import Set
 
 
 def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
@@ -78,13 +77,9 @@ def touch_turn(file_path: Path | str | None = None, output_dir: Path | str | Non
     # 用于统计各 turns 值出现频率
     turn_counts : Counter = Counter()
 
-    # 检验 conv_a 与 conv_b 长度一致性
-    mismatch_conv_length : bool = False
-    mismatch_conv_length_ids : Set[str] = set()
-
-    # 检验 conv_a 长度与 turns 关系
-    mismatch_turn_value : bool = False
-    mismatch_turn_ids : Set[str] = set()
+    # 保留异常 id 集合，是因为需要给出反例示例，不能只保留计数
+    mismatch_conv_length_ids : set[object] = set()
+    mismatch_turn_ids : set[object] = set()
 
     for row in df.itertuples(index=False):
         row_id = getattr(row, "id")
@@ -101,21 +96,19 @@ def touch_turn(file_path: Path | str | None = None, output_dir: Path | str | Non
         turn_counts[turn] += 1
 
         if len(conv_a) != len(conv_b):
-            mismatch_conv_length = True
             mismatch_conv_length_ids.add(row_id)
 
         expected_turn : int = len(conv_a) // 2
         if expected_turn != turn:
-            mismatch_turn_value = True
             mismatch_turn_ids.add(row_id)
 
     print(f"发现 {len(turn_counts)} 种不同的 turns 字段值")
-    print(f"  len(conv_a) 是否总等于 len(conv_b)：{not mismatch_conv_length}")
-    if mismatch_conv_length:
+    print(f"  len(conv_a) 是否总等于 len(conv_b)：{not mismatch_conv_length_ids}")
+    if mismatch_conv_length_ids:
         print(f"  反例数量: {len(mismatch_conv_length_ids)}，示例 id: {list(mismatch_conv_length_ids)[:10]}")
 
-    print(f"  len(conv_a) / 2 是否总等于 turn：{not mismatch_turn_value}")
-    if mismatch_turn_value:
+    print(f"  len(conv_a) / 2 是否总等于 turn：{not mismatch_turn_ids}")
+    if mismatch_turn_ids:
         print(f"  反例数量: {len(mismatch_turn_ids)}，示例 id: {list(mismatch_turn_ids)[:10]}")
 
     generate_turn_report(

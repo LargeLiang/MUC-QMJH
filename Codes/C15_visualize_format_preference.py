@@ -61,6 +61,53 @@ def get_format_data_path(root: Path | str | None = None) -> Path:
     return root_path / "Data" / "format_data" / "format_data.parquet"
 
 
+def get_chart_output_path(chart_key: str,
+                          root: Path | str | None = None) -> Path:
+    """
+    返回格式偏好图表输出路径。
+
+    同一脚本生成的图表统一使用 P05_XX 前缀编号，保持组号一致。
+    """
+
+    if root is None:
+        root_path = Path.cwd()
+    else:
+        root_path = Path(root)
+
+    chart_name_map = {
+        'presence': 'P05_01_format_presence_bar_chart.png',
+        'header_count': 'P05_02_header_count_line_chart.png',
+        'list_count': 'P05_03_list_count_line_chart.png',
+        'bold_count': 'P05_04_bold_count_line_chart.png',
+        'combination': 'P05_05_format_combination_bar_chart.png',
+    }
+    return root_path / "Pictures" / chart_name_map[chart_key]
+
+
+def get_table_output_path(table_key: str,
+                          root: Path | str | None = None) -> Path:
+    """
+    返回格式偏好统计表输出路径。
+
+    同一脚本生成的表格统一使用 T02_XX 前缀编号，保持组号一致。
+    """
+
+    if root is None:
+        root_path = Path.cwd()
+    else:
+        root_path = Path(root)
+
+    table_name_map = {
+        'basic_statistics': 'T02_01_basic_statistics.csv',
+        'format_presence': 'T02_02_format_presence_analysis.csv',
+        'header_count': 'T02_03_header_count_analysis.csv',
+        'list_count': 'T02_04_list_count_analysis.csv',
+        'bold_count': 'T02_05_bold_count_analysis.csv',
+        'combination': 'T02_06_format_combination_analysis.csv',
+    }
+    return root_path / "Tables" / table_name_map[table_key]
+
+
 
 # ========================================================================
 # 格式特征提取函数：从嵌套字典中提取原始特征值
@@ -676,7 +723,7 @@ def plot_presence_bar_chart(presence_df: pd.DataFrame,
     # ========================================================================
     plt.tight_layout()
     
-    chart_path = output_dir / "P06_format_presence_bar_chart.png"
+    chart_path = get_chart_output_path('presence', output_dir.parent)
     plt.savefig(chart_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
     
@@ -743,11 +790,11 @@ def plot_count_feature_line_chart(count_stats: pd.DataFrame,
     
     # 若未指定输出文件名，按约定自动生成
     if output_filename is None:
-        # 映射关系：header_count -> P07, list_count -> P08, bold_count -> P09
+        # 映射关系：同一脚本内的计数折线图统一使用 P05_02 ~ P05_04 组号。
         name_map = {
-            'header_count': 'P07_header_count_line_chart.png',
-            'list_count': 'P08_list_count_line_chart.png',
-            'bold_count': 'P09_bold_count_line_chart.png'
+            'header_count': get_chart_output_path('header_count', output_dir.parent).name,
+            'list_count': get_chart_output_path('list_count', output_dir.parent).name,
+            'bold_count': get_chart_output_path('bold_count', output_dir.parent).name,
         }
         output_filename = name_map.get(feature_name, f'P__{feature_name}_line_chart.png')
     
@@ -895,7 +942,7 @@ def plot_header_count_line_chart(header_stats: pd.DataFrame,
     """
     return plot_count_feature_line_chart(header_stats, 'header_count',
                                         best_header_count, best_header_win_rate,
-                                        output_dir, 'P07_header_count_line_chart.png')
+                                        output_dir, get_chart_output_path('header_count', Path(output_dir).parent if output_dir is not None else None).name)
 
 
 def plot_list_count_line_chart(list_stats: pd.DataFrame, 
@@ -909,7 +956,7 @@ def plot_list_count_line_chart(list_stats: pd.DataFrame,
     """
     return plot_count_feature_line_chart(list_stats, 'list_count',
                                         best_list_count, best_list_win_rate,
-                                        output_dir, 'P08_list_count_line_chart.png')
+                                        output_dir, get_chart_output_path('list_count', Path(output_dir).parent if output_dir is not None else None).name)
 
 
 def plot_bold_count_line_chart(bold_stats: pd.DataFrame, 
@@ -923,7 +970,7 @@ def plot_bold_count_line_chart(bold_stats: pd.DataFrame,
     """
     return plot_count_feature_line_chart(bold_stats, 'bold_count',
                                         best_bold_count, best_bold_win_rate,
-                                        output_dir, 'P09_bold_count_line_chart.png')
+                                        output_dir, get_chart_output_path('bold_count', Path(output_dir).parent if output_dir is not None else None).name)
 
 
 
@@ -1019,7 +1066,7 @@ def plot_combination_bar_chart(combination_stats: pd.DataFrame,
     # ========================================================================
     plt.tight_layout()
     
-    chart_path = output_dir / "P10_format_combination_bar_chart.png"
+    chart_path = get_chart_output_path('combination', output_dir.parent)
     plt.savefig(chart_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
     
@@ -1043,17 +1090,17 @@ def create_summary_tables(format_data: pd.DataFrame,
     本函数将各个分析阶段的结果导出为格式化的CSV表格，便于后续的报告生成和数据分析。
     
     生成的CSV文件说明：
-    - T03_basic_statistics.csv：基本统计信息
+        - T02_01_basic_statistics.csv：基本统计信息
       * 各格式特征的描述性统计（均值、标准差、最小值等）
-    - T04_format_presence_analysis.csv：格式存在性分析
+        - T02_02_format_presence_analysis.csv：格式存在性分析
       * 有/无各种格式时的胜率对比
-    - T05_header_count_analysis.csv：标题数分析
+        - T02_03_header_count_analysis.csv：标题数分析
       * 不同标题数范围内的胜率分布
-    - T06_list_count_analysis.csv：列表数分析
+        - T02_04_list_count_analysis.csv：列表数分析
       * 不同列表数范围内的胜率分布
-    - T07_bold_count_analysis.csv：粗体数分析
+        - T02_05_bold_count_analysis.csv：粗体数分析
       * 不同粗体数范围内的胜率分布
-    - T08_format_combination_analysis.csv：格式组合分析
+        - T02_06_format_combination_analysis.csv：格式组合分析
       * 各种格式组合的胜率排名
     
     参数说明：
@@ -1087,49 +1134,49 @@ def create_summary_tables(format_data: pd.DataFrame,
     # ========================================================================
     # 对关键的数值列进行描述性统计（均值、标准差、分位数等）
     basic_stats = format_data[['list_count', 'header_count', 'bold_count', 'total_format']].describe()
-    basic_stats_path = output_dir / "T03_basic_statistics.csv"
+    basic_stats_path = get_table_output_path('basic_statistics', output_dir.parent)
     basic_stats.to_csv(basic_stats_path, encoding='utf-8-sig')
-    print(f"  已保存: T03_basic_statistics.csv")
+    print(f"  已保存: {basic_stats_path.name}")
     
     # ========================================================================
     # 第二步：保存格式存在性分析表
     # ========================================================================
     # 包含：有/无格式时的胜率、样本数、占比等
-    presence_path = output_dir / "T04_format_presence_analysis.csv"
+    presence_path = get_table_output_path('format_presence', output_dir.parent)
     presence_df.to_csv(presence_path, index=False, encoding='utf-8-sig')
-    print(f"  已保存: T04_format_presence_analysis.csv")
+    print(f"  已保存: {presence_path.name}")
     
     # ========================================================================
     # 第三步：保存标题数分析表（如果非空）
     # ========================================================================
     if len(header_stats) > 0:
-        header_path = output_dir / "T05_header_count_analysis.csv"
+        header_path = get_table_output_path('header_count', output_dir.parent)
         header_stats.to_csv(header_path, index=False, encoding='utf-8-sig')
-        print(f"  已保存: T05_header_count_analysis.csv")
+        print(f"  已保存: {header_path.name}")
     
     # ========================================================================
     # 第四步：保存列表数分析表（如果非空）
     # ========================================================================
     if len(list_stats) > 0:
-        list_path = output_dir / "T06_list_count_analysis.csv"
+        list_path = get_table_output_path('list_count', output_dir.parent)
         list_stats.to_csv(list_path, index=False, encoding='utf-8-sig')
-        print(f"  已保存: T06_list_count_analysis.csv")
+        print(f"  已保存: {list_path.name}")
     
     # ========================================================================
     # 第五步：保存粗体数分析表（如果非空）
     # ========================================================================
     if len(bold_stats) > 0:
-        bold_path = output_dir / "T07_bold_count_analysis.csv"
+        bold_path = get_table_output_path('bold_count', output_dir.parent)
         bold_stats.to_csv(bold_path, index=False, encoding='utf-8-sig')
-        print(f"  已保存: T07_bold_count_analysis.csv")
+        print(f"  已保存: {bold_path.name}")
     
     # ========================================================================
     # 第六步：保存格式组合分析表（如果非空）
     # ========================================================================
     if len(combination_stats) > 0:
-        combo_path = output_dir / "T08_format_combination_analysis.csv"
+        combo_path = get_table_output_path('combination', output_dir.parent)
         combination_stats.to_csv(combo_path, index=False, encoding='utf-8-sig')
-        print(f"  已保存: T08_format_combination_analysis.csv")
+        print(f"  已保存: {combo_path.name}")
     
     print(f"所有统计表格已保存到: {output_dir}")
     print("=" * 80)

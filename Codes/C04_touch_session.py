@@ -15,7 +15,6 @@ C04_touch_session
 import pandas as pd
 from pathlib import Path
 from collections import Counter
-from typing import Set
 
 
 def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
@@ -68,34 +67,27 @@ def touch_session(file_path: Path | str | None = None, output_dir: Path | str | 
 
     print(f"  读取成功，数据形状: {df.shape}")
 
-    # 使用 pandas 高效统计每个 session_id 的出现次数
+    # 借助 Counter 统计 evaluation_session_id 的出现次数，识别多次出现的 session
     session_counts : pd.Series = df["evaluation_session_id"].value_counts()
 
-    # 提取唯一 session_id 集合
-    unique_evaluation_session_ids : set[str] = set(session_counts.index)
+    frequent_session_counts : pd.Series = session_counts[session_counts > 1]
 
-    # 找出出现次数大于1的 session_id
-    frequent_evaluation_session_ids : set[str] = set(session_counts[session_counts > 1].index)
-    frequent_evaluation_session_id_counts : dict[str, int] = session_counts[session_counts > 1].to_dict()
-
-    print(f"  发现 {len(unique_evaluation_session_ids)} 种不同的 evaluation_session_id 字段值")
-    print(f"  发现 {len(frequent_evaluation_session_ids)} 种多次出现的 evaluation_session_id 字段值")
+    print(f"  发现 {len(session_counts)} 种不同的 evaluation_session_id 字段值")
+    print(f"  发现 {len(frequent_session_counts)} 种多次出现的 evaluation_session_id 字段值")
 
     # 调用报告生成函数，传入统计结果
     generate_session_report(
         file_path=file_path,
         total_rows=len(df),
-        unique_ids=unique_evaluation_session_ids,
-        unique_counts=session_counts.to_dict(),
-        frequent_ids=frequent_evaluation_session_ids,
-        frequent_counts=frequent_evaluation_session_id_counts,
+        session_counts=session_counts,
+        frequent_session_counts=frequent_session_counts,
         output_dir=output_dir
     )
 
 
 def generate_session_report(file_path: Path, total_rows: int,
-                            unique_ids: Set[str], unique_counts: dict,
-                            frequent_ids: Set[str], frequent_counts: dict,
+                            session_counts: pd.Series,
+                            frequent_session_counts: pd.Series,
                             output_dir: Path) -> None:
     """
     生成 evaluation_session_id 分析报告。
@@ -119,13 +111,13 @@ def generate_session_report(file_path: Path, total_rows: int,
         f.write("-" * 40 + "\n")
         f.write(f"分析文件: {file_path}\n")
         f.write(f"数据总行数: {total_rows}\n")
-        f.write(f"evaluation_session_id 唯一值数量: {len(unique_ids)}\n")
-        f.write(f"多次出现的 evaluation_session_id 数量: {len(frequent_ids)}\n\n")
+        f.write(f"evaluation_session_id 唯一值数量: {len(session_counts)}\n")
+        f.write(f"多次出现的 evaluation_session_id 数量: {len(frequent_session_counts)}\n\n")
 
         # 2. 出现次数分布：统计每种出现次数对应的 session 数量
         f.write("2. 出现次数分布\n")
         f.write("-" * 40 + "\n")
-        occurrence_distribution = Counter(unique_counts.values())
+        occurrence_distribution = Counter(session_counts.tolist())
         f.write(f"{'出现次数':>5} {'evaluation_session_id 数量':>30}\n")
         f.write("-" * 40 + "\n")
         for occ in sorted(occurrence_distribution.keys()):
@@ -135,7 +127,7 @@ def generate_session_report(file_path: Path, total_rows: int,
         # 3. 多次出现 session 详情（前10个，按出现次数降序）
         f.write("3. 多次出现 evaluation_session_id 详情（前10个）\n")
         f.write("-" * 40 + "\n")
-        sorted_frequent = sorted(frequent_counts.items(), key=lambda x: x[1], reverse=True)
+        sorted_frequent = list(frequent_session_counts.items())
         f.write(f"{'排名':>5} {'出现次数':>5} {'evaluation_session_id':>40}\n")
         f.write("-" * 40 + "\n")
         for i, (sid, cnt) in enumerate(sorted_frequent[:10], 1):
@@ -143,7 +135,7 @@ def generate_session_report(file_path: Path, total_rows: int,
         f.write("\n")
 
         # 计算多次出现的 session 占总行数的比例
-        frequent_entries = sum(frequent_counts.values())
+        frequent_entries = int(frequent_session_counts.sum())
         ratio = frequent_entries / total_rows if total_rows > 0 else 0
         f.write(f"多次出现的 evaluation_session_id 共包含 {frequent_entries} 行，占总行数的 {ratio:.2%}\n\n")
 

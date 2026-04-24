@@ -16,7 +16,6 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from collections import Counter
-from typing import Set
 
 
 def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
@@ -71,42 +70,34 @@ def touch_role(file_path: Path | str | None = None, output_dir: Path | str | Non
 
     a_role_counts: Counter = Counter()
     b_role_counts: Counter = Counter()
-    a_roles: Set[str] = set()
-    b_roles: Set[str] = set()
 
-    # 遍历每条记录，提取 conversation_a / conversation_b 中的 role 标签
+    def collect_role_counts(conversation: list | tuple | np.ndarray, role_counts: Counter) -> None:
+        """遍历单侧对话并累计 role 频数。"""
+
+        if not isinstance(conversation, (list, tuple, np.ndarray)):
+            return
+
+        for segment in conversation:
+            if not isinstance(segment, dict):
+                continue
+            role : str | None = segment.get("role")
+            if role is None:
+                continue
+            role_counts[role] += 1
+
     for row in df.itertuples(index=False):
         conversation_a : list | tuple | np.ndarray = getattr(row, "conversation_a")
         conversation_b : list | tuple | np.ndarray = getattr(row, "conversation_b")
 
-        if isinstance(conversation_a, (list, tuple, np.ndarray)):
-            for segment in conversation_a:
-                if not isinstance(segment, dict):
-                    continue
-                role : str | None = segment.get("role")
-                if role is None:
-                    continue
-                a_roles.add(role)
-                a_role_counts[role] += 1
+        collect_role_counts(conversation_a, a_role_counts)
+        collect_role_counts(conversation_b, b_role_counts)
 
-        if isinstance(conversation_b, (list, tuple, np.ndarray)):
-            for segment in conversation_b:
-                if not isinstance(segment, dict):
-                    continue
-                role : str | None = segment.get("role")
-                if role is None:
-                    continue
-                b_roles.add(role)
-                b_role_counts[role] += 1
-
-    print(f"在 conversation_a 中发现 {len(a_roles)} 种不同的 role 值")
-    print(f"在 conversation_b 中发现 {len(b_roles)} 种不同的 role 值")
+    print(f"在 conversation_a 中发现 {len(a_role_counts)} 种不同的 role 值")
+    print(f"在 conversation_b 中发现 {len(b_role_counts)} 种不同的 role 值")
 
     generate_role_report(
         file_path=file_path,
         total_rows=len(df),
-        a_roles=a_roles,
-        b_roles=b_roles,
         a_role_counts=a_role_counts,
         b_role_counts=b_role_counts,
         output_dir=output_dir,
@@ -114,7 +105,6 @@ def touch_role(file_path: Path | str | None = None, output_dir: Path | str | Non
 
 
 def generate_role_report(file_path: Path, total_rows: int,
-                         a_roles: Set[str], b_roles: Set[str],
                          a_role_counts: Counter, b_role_counts: Counter,
                          output_dir: Path) -> None:
     """
@@ -122,6 +112,8 @@ def generate_role_report(file_path: Path, total_rows: int,
     """
 
     report_path = output_dir / "R05_role_report.txt"
+    a_roles = set(a_role_counts.keys())
+    b_roles = set(b_role_counts.keys())
 
     print("=" * 80)
     print("生成 role 分析报告...")

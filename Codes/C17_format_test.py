@@ -15,9 +15,12 @@ C17_format_test
 多重比较：每子集内 3 个特征做 Bonferroni 校正（k=3）。
 
 数据流向：
-  Data/optimized_data/  →  Wilcoxon + 卡方 + 密度检验  →  Reports/R14_format_test_report.txt
+    Data/optimized_data/  →  Wilcoxon + 卡方 + 密度检验  →  Reports/R14_format_test_report.txt
+                                                                                                                Tables/T19_format_test_summary.csv
+                                                                                                                Pictures/P13_format_effect_heatmaps.png
 """
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -30,6 +33,27 @@ def get_data_dir(root: Path | str | None = None) -> Path:
     if root is None:
         return Path.cwd() / "Data" / "optimized_data"
     return Path(root) / "Data" / "optimized_data"
+
+
+def get_report_path(root: Path | str | None = None) -> Path:
+    """返回 R14 报告路径。"""
+    if root is None:
+        root = Path.cwd()
+    return Path(root) / "Reports" / "R14_format_test_report.txt"
+
+
+def get_table_path(root: Path | str | None = None) -> Path:
+    """返回 C17 汇总表路径。"""
+    if root is None:
+        root = Path.cwd()
+    return Path(root) / "Tables" / "T19_format_test_summary.csv"
+
+
+def get_picture_path(root: Path | str | None = None) -> Path:
+    """返回 C17 主图路径。"""
+    if root is None:
+        root = Path.cwd()
+    return Path(root) / "Pictures" / "P13_format_effect_heatmaps.png"
 
 
 SUBSETS: List[Tuple[str, str]] = [
@@ -52,6 +76,26 @@ SUBSETS: List[Tuple[str, str]] = [
     ("指令+数学+代码",   "if_math_code_data.parquet"),
     ("四类全含",         "all_categories_data.parquet"),
 ]
+
+SUBSET_LABELS_EN = {
+    "全量": "Full",
+    "无类别": "No category",
+    "仅创意写作": "CW only",
+    "仅指令遵循": "IF only",
+    "仅数学": "Math only",
+    "仅代码": "Code only",
+    "创意+指令": "CW + IF",
+    "创意+数学": "CW + Math",
+    "创意+代码": "CW + Code",
+    "指令+数学": "IF + Math",
+    "指令+代码": "IF + Code",
+    "数学+代码": "Math + Code",
+    "创意+指令+数学": "CW + IF + Math",
+    "创意+指令+代码": "CW + IF + Code",
+    "创意+数学+代码": "CW + Math + Code",
+    "指令+数学+代码": "IF + Math + Code",
+    "四类全含": "All four",
+}
 
 FEATURES = ["header", "list", "bold"]
 MIN_PAIRS = 30
@@ -234,26 +278,130 @@ def run_one_subset(label: str, df: pd.DataFrame) -> Optional[Dict]:
     return {"label": label, "n_pairs": n_total, "features": feature_results}
 
 
+def _configure_plot_style() -> None:
+    """配置论文图表的全局样式。"""
+    plt.rcParams["font.sans-serif"] = ["SimHei", "Microsoft YaHei", "Arial Unicode MS", "DejaVu Sans"]
+    plt.rcParams["axes.unicode_minus"] = False
+    plt.style.use("seaborn-v0_8-darkgrid")
+
+
+def build_summary_df(all_results: List[Dict]) -> pd.DataFrame:
+    """将全部子集的格式检验结果展开为长表。"""
+    rows: List[Dict] = []
+    for res in all_results:
+        for feature_result in res["features"]:
+            rows.append({
+                "subset": res["label"],
+                "n_pairs": res["n_pairs"],
+                **feature_result,
+            })
+    if not rows:
+        return pd.DataFrame()
+    summary_df = pd.DataFrame(rows)
+    subset_order = (
+        summary_df.groupby("subset")["rank_biserial_r"].apply(lambda s: s.abs().mean())
+        .sort_values(ascending=False)
+        .index
+        .tolist()
+    )
+    summary_df["subset"] = pd.Categorical(summary_df["subset"], categories=subset_order, ordered=True)
+    return summary_df.sort_values(["subset", "feature"]).reset_index(drop=True)
+
+
+def plot_format_heatmaps(summary_df: pd.DataFrame, picture_path: Path) -> None:
+    """绘制格式偏好效应热图与密度检验热图。"""
+    if summary_df.empty:
+        return
+
+    _configure_plot_style()
+    feature_labels = {"header": "Header", "list": "List", "bold": "Bold"}
+    order = list(dict.fromkeys(summary_df["subset"].astype(str).tolist()))
+    r_matrix = (
+        summary_df.assign(feature_label=summary_df["feature"].map(feature_labels))
+        .pivot(index="subset", columns="feature_label", values="rank_biserial_r")
+        .reindex(order)
+    )
+    density_matrix = (
+        summary_df.assign(feature_label=summary_df["feature"].map(feature_labels))
+        .pivot(index="subset", columns="feature_label", values="density_p_value")
+        .reindex(order)
+    )
+
+    fig, axes = plt.subplots(1, 2, figsize=(15, max(7, len(r_matrix) * 0.42)), constrained_layout=True)
+    im_r = axes[0].imshow(r_matrix.to_numpy(dtype=float), aspect="auto", cmap="RdBu_r", vmin=-1, vmax=1)
+    axes[0].set_title("Rank-biserial r")
+
+    density_values = density_matrix.to_numpy(dtype=float)
+    density_strength = -np.log10(np.clip(density_values, 1e-12, 1.0))
+    im_density = axes[1].imshow(density_strength, aspect="auto", cmap="YlGnBu")
+    axes[1].set_title("Density evidence (-log10 p)")
+
+    for ax in axes:
+        ax.set_xticks(np.arange(len(r_matrix.columns)))
+        ax.set_xticklabels(r_matrix.columns)
+        ax.set_yticks(np.arange(len(r_matrix.index)))
+        ax.set_yticklabels([SUBSET_LABELS_EN.get(idx, idx) for idx in r_matrix.index])
+
+    for i in range(r_matrix.shape[0]):
+        for j in range(r_matrix.shape[1]):
+            r_value = r_matrix.iat[i, j]
+            if not np.isnan(r_value):
+                cell_row = summary_df[
+                    (summary_df["subset"].astype(str) == r_matrix.index[i])
+                    & (summary_df["feature"].map(feature_labels) == r_matrix.columns[j])
+                ]
+                sig_mark = "*" if (not cell_row.empty and bool(cell_row.iloc[0]["significant"])) else ""
+                axes[0].text(j, i, f"{r_value:.2f}{sig_mark}", ha="center", va="center", fontsize=9, color="#111827")
+            density_p = density_matrix.iat[i, j]
+            if not np.isnan(density_p):
+                axes[1].text(j, i, f"{density_p:.3f}", ha="center", va="center", fontsize=8.5, color="#111827")
+
+    fig.colorbar(im_r, ax=axes[0], fraction=0.046, pad=0.04)
+    fig.colorbar(im_density, ax=axes[1], fraction=0.046, pad=0.04)
+    fig.suptitle("C17 Format Preference Overview")
+    picture_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(picture_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+
 def run_format_test(data_dir: Path | str | None = None,
-                    report_dir: Path | str | None = None) -> None:
+                    report_dir: Path | str | None = None,
+                    table_dir: Path | str | None = None,
+                    picture_dir: Path | str | None = None) -> dict[str, Path] | None:
     """
     对所有预定义子集执行格式偏好检验并生成报告。
 
     参数说明：
     - data_dir：子集 parquet 文件目录（默认为 Data/optimized_data）
     - report_dir：报告保存目录（默认为 Reports）
+    - table_dir：汇总表保存目录（默认为 Tables）
+    - picture_dir：图片保存目录（默认为 Pictures）
     """
+    root = Path.cwd()
+
     if data_dir is None:
         data_dir = get_data_dir()
     else:
         data_dir = Path(data_dir)
 
     if report_dir is None:
-        report_dir = Path.cwd() / "Reports"
+        report_dir = get_report_path(root).parent
     else:
         report_dir = Path(report_dir)
 
+    if table_dir is None:
+        table_path = get_table_path(root)
+    else:
+        table_path = Path(table_dir) / "T19_format_test_summary.csv"
+
+    if picture_dir is None:
+        picture_path = get_picture_path(root)
+    else:
+        picture_path = Path(picture_dir) / "P13_format_effect_heatmaps.png"
+
     report_dir.mkdir(parents=True, exist_ok=True)
+    table_path.parent.mkdir(parents=True, exist_ok=True)
+    picture_path.parent.mkdir(parents=True, exist_ok=True)
 
     all_results: List[Dict] = []
 
@@ -283,6 +431,14 @@ def run_format_test(data_dir: Path | str | None = None,
         return
 
     generate_report(all_results, report_dir)
+    summary_df = build_summary_df(all_results)
+    summary_df.to_csv(table_path, index=False, encoding="utf-8-sig")
+    plot_format_heatmaps(summary_df, picture_path)
+    return {
+        "report": report_dir / "R14_format_test_report.txt",
+        "table": table_path,
+        "picture": picture_path,
+    }
 
 
 def generate_report(all_results: List[Dict], report_dir: Path) -> None:

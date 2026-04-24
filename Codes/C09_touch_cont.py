@@ -16,7 +16,6 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from collections import Counter
-from typing import Dict, Set
 
 
 def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
@@ -69,11 +68,11 @@ def touch_cont(file_path: Path | str | None = None, output_dir: Path | str | Non
 
     print(f"  读取成功，数据形状: {df.shape}")
 
-    # 初始化统计变量，包括 content 列表长度分布、次级字段分布，以及缺失 content 的记录 ID 集合
+    # 初始化统计变量，包括 content 列表长度分布、次级字段分布，以及缺失 content 的行级计数
     a_cont_item_counts: Counter = Counter()
     b_cont_item_counts: Counter = Counter()
-    a_missing_cont_ids: set = set() 
-    b_missing_cont_ids: set = set()
+    a_missing_cont_count: int = 0
+    b_missing_cont_count: int = 0
 
     # 由于 content 字段是一个列表，我们需要统计每条记录中 content 列表的长度分布，以及其中各项的 type、text、image、mimeType 分布。
     a_type_counts: Counter = Counter()
@@ -92,56 +91,64 @@ def touch_cont(file_path: Path | str | None = None, output_dir: Path | str | Non
             return list(content)
         return []
 
+    def update_content_stats(
+        conversation,
+        cont_item_counts: Counter,
+        type_counts: Counter,
+        text_counts: Counter,
+        image_counts: Counter,
+        mime_type_counts: Counter,
+    ) -> bool:
+        """遍历单侧对话并累计 content 相关统计，返回该行是否出现空 content。"""
+
+        has_missing_content = False
+        for side in normalize_content_list(conversation):
+            if not isinstance(side, dict):
+                continue
+
+            content : list = normalize_content_list(side.get("content"))
+            cont_item_counts[len(content)] += 1
+
+            if len(content) == 0:
+                has_missing_content = True
+                continue
+
+            for item in content:
+                if not isinstance(item, dict):
+                    continue
+                type_counts[item.get("type") or "<missing>"] += 1
+                text_counts[item.get("text") or "<missing>"] += 1
+                image_counts[item.get("image") or "<missing>"] += 1
+                mime_type_counts[item.get("mimeType") or "<missing>"] += 1
+
+        return has_missing_content
+
     for row in df.itertuples(index=False):
-        row_id = getattr(row, "id")
         conversation_a : list = getattr(row, "conversation_a")
         conversation_b : list = getattr(row, "conversation_b")
 
-        # 遍历 conversation_a 和 conversation_b 中的每个对话段，统计 content 列表长度分布，以及 type、text、image、mimeType 的分布情况
-        for side in normalize_content_list(conversation_a):
-            if not isinstance(side, dict):
-                continue
-
-            content : list = normalize_content_list(side.get("content"))
-            a_cont_item_counts[len(content)] += 1
-            
-            # 如果 content 列表为空，则记录该行 ID 到 a_missing_cont_ids 集合中，并跳过后续统计
-            if len(content) == 0:
-                a_missing_cont_ids.add(row_id)
-                continue
-
-            for item in content:
-                if not isinstance(item, dict):
-                    continue
-                a_type_counts[item.get("type") or "<missing>"] += 1
-                a_text_counts[item.get("text") or "<missing>"] += 1
-                a_image_counts[item.get("image") or "<missing>"] += 1
-                a_mimeType_counts[item.get("mimeType") or "<missing>"] += 1
-
-        for side in normalize_content_list(conversation_b):
-            if not isinstance(side, dict):
-                continue
-
-            content : list = normalize_content_list(side.get("content"))
-            b_cont_item_counts[len(content)] += 1
-            
-            # 如果 content 列表为空，则记录该行 ID 到 b_missing_cont_ids 集合中，并跳过后续统计
-            if len(content) == 0:
-                b_missing_cont_ids.add(row_id)
-                continue
-            
-            for item in content:
-                if not isinstance(item, dict):
-                    continue
-                b_type_counts[item.get("type") or "<missing>"] += 1
-                b_text_counts[item.get("text") or "<missing>"] += 1
-                b_image_counts[item.get("image") or "<missing>"] += 1
-                b_mimeType_counts[item.get("mimeType") or "<missing>"] += 1
+        # 方法：空 content 仅用于计数时，不再维护整套 id 集合；逐行布尔返回即可保留原语义。
+        a_missing_cont_count += int(update_content_stats(
+            conversation_a,
+            a_cont_item_counts,
+            a_type_counts,
+            a_text_counts,
+            a_image_counts,
+            a_mimeType_counts,
+        ))
+        b_missing_cont_count += int(update_content_stats(
+            conversation_b,
+            b_cont_item_counts,
+            b_type_counts,
+            b_text_counts,
+            b_image_counts,
+            b_mimeType_counts,
+        ))
 
     print(f"在 conversation_a 中发现 {len(a_cont_item_counts)} 种 len(content) 值")
     print(f"在 conversation_b 中发现 {len(b_cont_item_counts)} 种 len(content) 值")
-    print(f"conversation_a 缺失 content 的行数: {len(a_missing_cont_ids)}")
-    print(f"conversation_b 缺失 content 的行数: {len(b_missing_cont_ids)}")
+    print(f"conversation_a 缺失 content 的行数: {a_missing_cont_count}")
+    print(f"conversation_b 缺失 content 的行数: {b_missing_cont_count}")
 
     generate_cont_report(
         file_path=file_path,
@@ -156,8 +163,8 @@ def touch_cont(file_path: Path | str | None = None, output_dir: Path | str | Non
         b_image_counts=b_image_counts,
         a_mimeType_counts=a_mimeType_counts,
         b_mimeType_counts=b_mimeType_counts,
-        a_missing_cont_ids=a_missing_cont_ids,
-        b_missing_cont_ids=b_missing_cont_ids,
+        a_missing_cont_count=a_missing_cont_count,
+        b_missing_cont_count=b_missing_cont_count,
         output_dir=output_dir,
     )
 
@@ -173,8 +180,8 @@ def generate_cont_report(file_path: Path, total_rows: int,
                          b_image_counts: Counter,
                          a_mimeType_counts: Counter,
                          b_mimeType_counts: Counter,
-                         a_missing_cont_ids: set,
-                         b_missing_cont_ids: set,
+                         a_missing_cont_count: int,
+                         b_missing_cont_count: int,
                          output_dir: Path) -> None:
     """生成 content 字段分析报告。"""
 
@@ -192,8 +199,8 @@ def generate_cont_report(file_path: Path, total_rows: int,
         f.write("-" * 100 + "\n")
         f.write(f"分析文件: {file_path}\n")
         f.write(f"数据总行数: {total_rows}\n")
-        f.write(f"conversation_a 缺失 content 行数: {len(a_missing_cont_ids)}\n")
-        f.write(f"conversation_b 缺失 content 行数: {len(b_missing_cont_ids)}\n\n")
+        f.write(f"conversation_a 缺失 content 行数: {a_missing_cont_count}\n")
+        f.write(f"conversation_b 缺失 content 行数: {b_missing_cont_count}\n\n")
 
         f.write("2. conversation_a content 长度分布\n")
         f.write("-" * 100 + "\n")
