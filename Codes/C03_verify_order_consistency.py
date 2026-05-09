@@ -15,17 +15,7 @@ C03_verify_order_consistency
 import pandas as pd
 from pathlib import Path
 
-def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
-    """返回整合数据 parquet 文件的默认路径。"""
-
-    # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
-    if root is None:
-        root_path : Path = Path.cwd()
-    else:
-        root_path : Path = Path(root)
-
-    # 原始数据文件位于项目根目录下的 Data/integrated_data/integrated_data.parquet
-    return root_path / "Data" / "integrated_data" / "integrated_data.parquet"
+from accessor import get_data_path, load_parquet_or_none
 
 
 def verify_order_consistency(file_path: Path | str | None = None) -> None:
@@ -33,29 +23,29 @@ def verify_order_consistency(file_path: Path | str | None = None) -> None:
     验证整合数据中 evaluation_session_id 与 evaluation_order 的一致性。
 
     通过统计每个 session 的记录数和全局最大 evaluation_order，帮助判断是否存在缺失或重复的 order。
+
+    参数说明：
+    - file_path：待分析的整合数据 parquet 文件路径（默认值为 integrated_data.parquet）
+
+    返回值：
+    - 无返回值，直接在控制台输出一致性结论
     """
 
     # 支持传入自定义文件路径，便于测试或在不同目录下运行脚本
     if file_path is None:
-        file_path : Path = get_integrated_parquet_path()
+        file_path : Path = get_data_path("integrated")
     else:        
         file_path : Path = Path(file_path)
 
-    # 如果文件不存在，则输出警告并返回
+    # 1. 读取输入数据
     print(f"正在分析文件: {file_path}")
-    if not file_path.exists():
-        print(f"  ERROR: 文件不存在: {file_path}")
-        return
-
-    # 读取 parquet 文件，并对读取异常进行捕获
-    try:
-        df : pd.DataFrame = pd.read_parquet(file_path)
-    except Exception as exc:
-        print(f"  ERROR: 读取 parquet 文件失败: {exc}")
+    df : pd.DataFrame | None = load_parquet_or_none(file_path)
+    if df is None:
         return
 
     print(f"  读取成功，数据形状: {df.shape}")
 
+    # 2. 汇总每个 session 的 order 统计量
     # 先压缩到 session 分组，再基于聚合结果判断一致性
     session_summary : pd.DataFrame = (
         df.groupby("evaluation_session_id")["evaluation_order"]
@@ -66,7 +56,8 @@ def verify_order_consistency(file_path: Path | str | None = None) -> None:
     max_session_size : int = int(session_summary["count"].max())
     max_evaluation_order : int = int(df["evaluation_order"].max())
 
-    # 这里使用 count 与 max_order 的关系判断是否存在缺失 order （如果 count < max_order，说明 session 中的记录数不足以覆盖从 1 到 max_order 的所有 order）
+    # 3. 根据聚合结果识别缺失或重复的 order
+    # 这里使用 count 与 max_order 的关系判断是否存在缺失 order
     inconsistent_order_sessions : pd.DataFrame = session_summary[
         session_summary["count"] < session_summary["max_order"]
     ]

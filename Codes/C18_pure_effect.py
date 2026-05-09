@@ -1,51 +1,16 @@
-# -*- coding: utf-8 -*-
 """
-长度与格式偏好净效应分析（配对逻辑回归嵌套模型 + 混淆比例量化）。
+C18_pure_effect
 
-研究问题：
-  控制问题特征及模型能力差异后，长度差值与格式密度差值对人类偏好的净效应有多大？
-  原始效应（r_rb=0.336, R13）中有多少百分比可归因于混淆变量？
+在控制混淆变量后估计长度与格式偏好的净效应，并量化效应衰减。
 
-分析框架（长度系列）：
-  配对偏好逻辑回归，结果变量 winner_a ∈ {0,1}；
-  核心预测变量 token_diff_ab = a_tokens − b_tokens（z 标准化）。
+功能：
+- 构造配对层面的长度差、格式密度差和模型差异特征
+- 分别拟合长度系列与格式系列的嵌套逻辑回归模型
+- 输出净效应汇总表、衰减图和方法报告
 
-  四层嵌套模型（M0 → M3）：
-    M0: winner_a ~ z_token_diff_ab                                         [粗效应]
-    M1: + 任务类型(CW/IF/MATH/CODE) + z_user_tokens + z_turns              [+问题特征]
-    M2: + criteria(7维)                                                     [+问题复杂度]
-    M3: + z_ability_diff + z_verbosity_diff + z_format_tendency_diff       [+模型能力与风格]
-
-分析框架（格式系列）：
-  三个格式密度差值变量：header/list/bold_density_diff（均 z 标准化）；
-  z_token_diff_ab 始终作为固定协变量（控制长度-格式共线性）；
-  三变量同时入模型，各系数代表控制其他格式类型后的净边际效应。
-
-  四层嵌套模型（F0 → F3）：
-    F0: winner_a ~ z_token_diff_ab + [z_header/list/bold_density_diff]     [粗格式效应，控制长度]
-    F1: + 任务类型 + z_user_tokens + z_turns                                [+问题特征]
-    F2: + criteria(7维)                                                     [+问题复杂度]
-    F3: + z_ability_diff + z_verbosity_diff + z_format_tendency_diff       [+模型能力与风格]
-
-净效应量指标：
-  - 调整后 Odds Ratio: exp(β @ 末层)
-  - 平均边际效应 AME: β × p̄(1 − p̄)
-  - Wald 部分相关 r: z_wald / sqrt(N)
-  - 混淆比例: (OR_层0 − OR_层末) / (OR_层0 − 1)
-
-数据来源：
-  C13 生成的纯净分区子集文件（Data/optimized_data/*_data.parquet）；
-  模型统计量从全量 optimized_data.parquet 统一计算后映射，不在子集内重估。
-
-输出：
-  Reports/R16_pure_effect_report.txt
-    Tables/T20_pure_length_net_effect_summary.csv
-    Tables/T21_pure_format_net_effect_summary.csv
-    Pictures/P14_length_confounding_attenuation.png
-    Pictures/P15_format_net_effect_heatmaps.png
-
-参考：
-  References/M03_confounding_analysis.md
+数据流向：
+    optimized_data.parquet 与 C13 子集 parquet → 配对特征构造与嵌套模型拟合 → Tables/T20_*.csv 与 Tables/T21_*.csv
+    + Reports/R16_pure_effect_report.txt + Pictures/P14_length_confounding_attenuation.png + Pictures/P15_format_net_effect_heatmaps.png
 """
 
 import warnings
@@ -58,72 +23,25 @@ import statsmodels.api as sm
 from matplotlib.colors import TwoSlopeNorm
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
+from accessor import (
+    build_output_paths,
+    get_analysis_subset_paths,
+    get_data_path,
+    get_output_path,
+    safe_int_count,
+    with_flat_analysis_columns,
+)
+from stats_utils import zscore_series
 
-# ── 路径工厂 ────────────────────────────────────────────────────────────────
+PURE_EFFECT_TABLE_FILES = {
+    "length": "T20_pure_length_net_effect_summary.csv",
+    "format": "T21_pure_format_net_effect_summary.csv",
+}
 
-def get_optimized_parquet_path(root: Path | str | None = None) -> Path:
-    if root is None:
-        root = Path.cwd()
-    return Path(root) / "Data" / "optimized_data" / "optimized_data.parquet"
-
-
-def get_report_path(root: Path | str | None = None) -> Path:
-    if root is None:
-        root = Path.cwd()
-    return Path(root) / "Reports" / "R16_pure_effect_report.txt"
-
-
-def get_table_paths(root: Path | str | None = None) -> dict[str, Path]:
-    """返回 C18 汇总表输出路径。"""
-    if root is None:
-        root = Path.cwd()
-    table_dir = Path(root) / "Tables"
-    return {
-        "length": table_dir / "T20_pure_length_net_effect_summary.csv",
-        "format": table_dir / "T21_pure_format_net_effect_summary.csv",
-    }
-
-
-def get_picture_paths(root: Path | str | None = None) -> dict[str, Path]:
-    """返回 C18 图表输出路径。"""
-    if root is None:
-        root = Path.cwd()
-    picture_dir = Path(root) / "Pictures"
-    return {
-        "length": picture_dir / "P14_length_confounding_attenuation.png",
-        "format": picture_dir / "P15_format_net_effect_heatmaps.png",
-    }
-
-
-def get_subset_paths(root: Path | str | None = None) -> dict[str, Path]:
-    """
-    返回 C13 生成的各纯净分区子集文件路径映射。
-
-    键为报告中使用的中文子集名，值为对应 parquet 文件的绝对路径。
-    全量子集直接指向 optimized_data.parquet（C13 不另存全量文件）。
-    """
-    if root is None:
-        root = Path.cwd()
-    d = Path(root) / "Data" / "optimized_data"
-    return {
-        "全量":           d / "optimized_data.parquet",
-        "无类别":         d / "no_category_data.parquet",
-        "仅创意写作":     d / "only_cw_data.parquet",
-        "仅指令遵循":     d / "only_if_data.parquet",
-        "仅数学":         d / "only_math_data.parquet",
-        "仅代码":         d / "only_code_data.parquet",
-        "创意+指令":      d / "cw_if_data.parquet",
-        "创意+数学":      d / "cw_math_data.parquet",
-        "创意+代码":      d / "cw_code_data.parquet",
-        "指令+数学":      d / "if_math_data.parquet",
-        "指令+代码":      d / "if_code_data.parquet",
-        "数学+代码":      d / "math_code_data.parquet",
-        "创意+指令+数学": d / "cw_if_math_data.parquet",
-        "创意+指令+代码": d / "cw_if_code_data.parquet",
-        "创意+数学+代码": d / "cw_math_code_data.parquet",
-        "指令+数学+代码": d / "if_math_code_data.parquet",
-        "四类全含":       d / "all_categories_data.parquet",
-    }
+PURE_EFFECT_PICTURE_FILES = {
+    "length": "P14_length_confounding_attenuation.png",
+    "format": "P15_format_net_effect_heatmaps.png",
+}
 
 
 SUBSET_LABELS_EN = {
@@ -153,24 +71,7 @@ FORMAT_LABELS_EN = {
 }
 
 
-# ── 数据加载与特征构建 ────────────────────────────────────────────────────────
-
-def _safe_count(val) -> int:
-    """
-    将格式计数列中可能存在的 dict / float / int / None 值统一转换为整数。
-
-    optimized_data 中部分行的 a_header_count 等列仍以 dict 形式存储
-    （如 {'h1': 2, 'h2': 1}），需要在分析前统一数值化。
-    """
-    if isinstance(val, dict):
-        return int(sum(val.values()))
-    if val is None:
-        return 0
-    try:
-        v = float(val)
-        return 0 if np.isnan(v) else int(v)
-    except (ValueError, TypeError):
-        return 0
+# 数据加载与特征构建
 
 
 def load_data_global(file_path: Path | str | None = None) -> pd.DataFrame:
@@ -180,9 +81,10 @@ def load_data_global(file_path: Path | str | None = None) -> pd.DataFrame:
     仅用于 build_model_stats() 的全局统计计算；
     子集分析从 C13 生成的分区文件读取（见 load_subset）。
     """
-    path = get_optimized_parquet_path() if file_path is None else Path(file_path)
+    path = get_data_path("optimized") if file_path is None else Path(file_path)
     df = pd.read_parquet(path)
-    return df[df["winner"].isin(["model_a", "model_b"])].copy()
+    df = df[df["winner"].isin(["model_a", "model_b"])].copy()
+    return with_flat_analysis_columns(df)
 
 
 def build_model_stats(df: pd.DataFrame) -> pd.DataFrame:
@@ -212,7 +114,7 @@ def build_model_stats(df: pd.DataFrame) -> pd.DataFrame:
 
     # 部分行格式计数列可能仍为 dict，统一转换为 int
     for col in ("header_count", "list_count", "bold_count"):
-        records[col] = records[col].map(_safe_count)
+        records[col] = records[col].map(safe_int_count)
 
     records["format_total"] = (records["header_count"] + records["list_count"]
                                + records["bold_count"])
@@ -255,7 +157,7 @@ def add_pair_features(df: pd.DataFrame, model_stats: pd.DataFrame) -> pd.DataFra
     # 格式计数列统一转 int（防止 dict 类型导致算术错误）
     for col in ("a_header_count", "a_list_count", "a_bold_count",
                 "b_header_count", "b_list_count", "b_bold_count"):
-        df[col] = df[col].map(_safe_count)
+        df[col] = df[col].map(safe_int_count)
 
     # 长度差值
     df["token_diff_ab"] = df["a_tokens"] - df["b_tokens"]
@@ -309,10 +211,11 @@ def load_subset(path: Path, model_stats: pd.DataFrame) -> pd.DataFrame:
     """
     df = pd.read_parquet(path)
     df = df[df["winner"].isin(["model_a", "model_b"])].copy()
+    df = with_flat_analysis_columns(df)
     return add_pair_features(df, model_stats)
 
 
-# ── 模型拟合工具 ─────────────────────────────────────────────────────────────
+# 模型拟合工具
 
 def _fit_logit(X: pd.DataFrame, y: pd.Series) -> dict | None:
     """
@@ -365,7 +268,7 @@ def _wald_partial_r(coef: float, se: float, n: int) -> float:
     return (coef / se) / np.sqrt(n)
 
 
-# ── 标准化辅助 ────────────────────────────────────────────────────────────────
+# 标准化辅助
 
 # 所有需要 z-score 标准化的连续型变量
 _CONT_VARS: list[str] = [
@@ -385,8 +288,7 @@ def _standardize(s: pd.DataFrame) -> pd.DataFrame:
     s = s.copy()
     for col in _CONT_VARS:
         if col in s.columns:
-            mu, sigma = s[col].mean(), s[col].std(ddof=1)
-            s[f"_z_{col}"] = (s[col] - mu) / sigma if sigma > 0 else 0.0
+            s[f"_z_{col}"] = zscore_series(s[col])
     return s
 
 
@@ -395,7 +297,7 @@ def _active(s: pd.DataFrame, cols: list[str]) -> list[str]:
     return [c for c in cols if c in s.columns and s[c].nunique() > 1]
 
 
-# ── 常量 ──────────────────────────────────────────────────────────────────────
+# 常量
 
 CRITERIA_COLS: list[str] = [
     "complexity", "creativity", "domain_knowledge",
@@ -417,7 +319,7 @@ FORMAT_DENSITY_LABELS: dict[str, str] = {
 }
 
 
-# ── 长度嵌套模型（M0 → M3） ───────────────────────────────────────────────────
+# 长度嵌套模型（M0 → M3）
 
 def run_nested_models_length(
     df: pd.DataFrame,
@@ -485,7 +387,7 @@ def run_nested_models_length(
         else np.nan
     )
 
-    # ── 写报告块 ──
+    # 写报告块
     w = 80
     report_lines += [
         "",
@@ -534,7 +436,7 @@ def run_nested_models_length(
     }
 
 
-# ── 格式嵌套模型（F0 → F3） ───────────────────────────────────────────────────
+# 格式嵌套模型（F0 → F3）
 
 def run_nested_models_format(
     df: pd.DataFrame,
@@ -594,7 +496,7 @@ def run_nested_models_format(
     fits = {lbl: _fit_logit(X.dropna(axis=1), y)
             for lbl, X in [("F0", F0), ("F1", F1), ("F2", F2), ("F3", F3)]}
 
-    # ── 写报告块（每层输出三个密度变量的系数行） ──
+    # 写报告块（每层输出三个密度变量的系数行）
     w = 80
     report_lines += [
         "",
@@ -632,7 +534,7 @@ def run_nested_models_format(
             if lbl == "F3":
                 or_f3[var] = or_v
 
-    # ── 各变量净效应小结 ──
+    # 各变量净效应小结
     report_lines.append("")
     confound_pcts: dict[str, float] = {}
     for var in FORMAT_DENSITY_VARS:
@@ -666,7 +568,7 @@ def run_nested_models_format(
     }
 
 
-# ── 验证：胜率 vs 词冗性 / 格式风格相关性 ────────────────────────────────────
+# 验证：胜率与词冗性、格式风格相关性
 
 def validate_model_confounding(
     model_stats: pd.DataFrame, report_lines: list[str]
@@ -696,7 +598,7 @@ def validate_model_confounding(
     ]
 
 
-# ── 汇总渲染 ──────────────────────────────────────────────────────────────────
+# 汇总渲染
 
 def _render_length_summary(results: list[dict | None], report_lines: list[str]) -> None:
     """长度净效应跨子集汇总表，按调整后 OR 降序排列。"""
@@ -911,7 +813,7 @@ def plot_format_heatmaps(format_df: pd.DataFrame, picture_path: Path) -> None:
     plt.close(fig)
 
 
-# ── 主流程 ────────────────────────────────────────────────────────────────────
+# 主流程
 
 def run_pure_effect(
     file_path: Path | str | None = None,
@@ -932,10 +834,10 @@ def run_pure_effect(
     root        = Path.cwd()
     report_path = (
         Path(report_dir) / "R16_pure_effect_report.txt"
-        if report_dir else get_report_path(root)
+        if report_dir else get_output_path("report", "R16_pure_effect_report.txt", root)
     )
     if table_dir is None:
-        table_paths = get_table_paths(root)
+        table_paths = build_output_paths("table", PURE_EFFECT_TABLE_FILES, root)
     else:
         table_root = Path(table_dir)
         table_paths = {
@@ -943,18 +845,18 @@ def run_pure_effect(
             "format": table_root / "T21_pure_format_net_effect_summary.csv",
         }
     if picture_dir is None:
-        picture_paths = get_picture_paths(root)
+        picture_paths = build_output_paths("picture", PURE_EFFECT_PICTURE_FILES, root)
     else:
         picture_root = Path(picture_dir)
         picture_paths = {
             "length": picture_root / "P14_length_confounding_attenuation.png",
             "format": picture_root / "P15_format_net_effect_heatmaps.png",
         }
-    subset_paths = get_subset_paths(root)
+    subset_paths = get_analysis_subset_paths(root)
 
     report_lines: list[str] = []
 
-    # ── 报告头 ──
+    # 报告头
     report_lines += [
         "=" * 80,
         "长度与格式偏好净效应分析报告（嵌套逻辑回归）",
@@ -973,9 +875,8 @@ def run_pure_effect(
     # ─ 步骤 1：全量数据 → 全局模型统计量（不使用子集重估，避免小样本偏差）
     print("=" * 60)
     print("步骤 1/5：加载全量 optimized_data（仅用于全局模型统计量计算）")
-    opt_path = get_optimized_parquet_path(root) if file_path is None else Path(file_path)
-    df_global = pd.read_parquet(opt_path)
-    df_global = df_global[df_global["winner"].isin(["model_a", "model_b"])].copy()
+    opt_path = get_data_path("optimized", root=root) if file_path is None else Path(file_path)
+    df_global = load_data_global(opt_path)
     print(f"  全量有效配对行数：{len(df_global):,}")
 
     print("步骤 2/5：计算全局模型统计量（胜率 / 词冗性 / 格式风格）")

@@ -1,15 +1,16 @@
 """
-格式偏好可视化分析脚本
+C15_visualize_format_preference
 
-本脚本对AI模型的输出格式偏好进行全面的可视化分析，包括：
-- 格式特征提取：从嵌套的format_counts字典中提取标题、列表、粗体等
-- 格式存在分析：有/无特定格式对胜率的影响
-- 计数分析：标题数、列表数、粗体数与胜率的关系
-- 组合分析：不同格式组合与胜率的关系
-- 统计报告：生成详细的统计表格和分析报告
+对解缠化后的格式特征进行描述性可视化分析，输出图表、统计表和文本报告。
+
+功能：
+- 提取标题、列表、粗体等格式特征及其密度指标
+- 分析格式存在性、计数分布和格式组合与胜率的关系
+- 输出可视化图像、统计表和分析报告
 
 数据流向：
-  optimized_data.parquet → 格式特征计算 → 分类分析 → 可视化 → 报告生成
+    optimized_data.parquet → 格式特征提取与解缠化 → 存在性/计数/组合分析 → 可视化图像输出
+    + Tables/T02_*.csv + Reports/R12_format_preference_report.txt
 """
 
 from pathlib import Path
@@ -20,157 +21,41 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import warnings
 
+from accessor import (
+    get_data_dir,
+    get_data_path,
+    get_output_dir,
+    load_parquet_or_none,
+    safe_int_count,
+    with_flat_analysis_columns,
+)
+
 # 全局配置：忽略所有警告（可选）
 warnings.filterwarnings('ignore')
 
-# matplotlib和seaborn配置：用于支持中文显示和美观的图表样式
+# matplotlib 和 seaborn 配置：用于支持中文显示和美观的图表样式
 plt.rcParams['font.sans-serif'] = ['SimHei', 'Arial Unicode MS', 'DejaVu Sans']
 plt.rcParams['axes.unicode_minus'] = False  # 用于正确显示负号
 plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
 
-
-# ========================================================================
-# 路径管理函数：集中管理项目中的文件和目录路径
-# ========================================================================
-
-def get_optimized_parquet_path(root: Path | str | None = None) -> Path:
-    """返回优化数据 parquet 文件的默认路径。"""
-    
-    # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
-    if root is None:
-        root_path = Path.cwd()
-    else:
-        root_path = Path(root)
-    
-    # 优化数据文件位于项目根目录下的 Data/optimized_data/optimized_data.parquet
-    return root_path / "Data" / "optimized_data" / "optimized_data.parquet"
-
-
-def get_format_data_path(root: Path | str | None = None) -> Path:
-    """
-    返回格式数据 parquet 文件的默认路径。
-    
-    此路径用于存储预处理后的格式特征数据，可用于后续快速分析。
-    """
-    if root is None:
-        root_path = Path.cwd()
-    else:
-        root_path = Path(root)
-    
-    return root_path / "Data" / "format_data" / "format_data.parquet"
-
-
-def get_chart_output_path(chart_key: str,
-                          root: Path | str | None = None) -> Path:
-    """
-    返回格式偏好图表输出路径。
-
-    同一脚本生成的图表统一使用 P05_XX 前缀编号，保持组号一致。
-    """
-
-    if root is None:
-        root_path = Path.cwd()
-    else:
-        root_path = Path(root)
-
-    chart_name_map = {
-        'presence': 'P05_01_format_presence_bar_chart.png',
-        'header_count': 'P05_02_header_count_line_chart.png',
-        'list_count': 'P05_03_list_count_line_chart.png',
-        'bold_count': 'P05_04_bold_count_line_chart.png',
-        'combination': 'P05_05_format_combination_bar_chart.png',
-    }
-    return root_path / "Pictures" / chart_name_map[chart_key]
-
-
-def get_table_output_path(table_key: str,
-                          root: Path | str | None = None) -> Path:
-    """
-    返回格式偏好统计表输出路径。
-
-    同一脚本生成的表格统一使用 T02_XX 前缀编号，保持组号一致。
-    """
-
-    if root is None:
-        root_path = Path.cwd()
-    else:
-        root_path = Path(root)
-
-    table_name_map = {
-        'basic_statistics': 'T02_01_basic_statistics.csv',
-        'format_presence': 'T02_02_format_presence_analysis.csv',
-        'header_count': 'T02_03_header_count_analysis.csv',
-        'list_count': 'T02_04_list_count_analysis.csv',
-        'bold_count': 'T02_05_bold_count_analysis.csv',
-        'combination': 'T02_06_format_combination_analysis.csv',
-    }
-    return root_path / "Tables" / table_name_map[table_key]
-
-
-
-# ========================================================================
-# 格式特征提取函数：从嵌套字典中提取原始特征值
-# ========================================================================
-
-def extract_header_count(header_dict: dict | None) -> int:
-    """
-    从header_counts字典中提取标题总数。
-    
-    参数说明：
-    - header_dict：格式为 {'h1': count, 'h2': count, ..., 'h6': count} 的字典，
-                   或为None（表示无标题数据）
-    
-    返回值：所有等级的标题总数（h1到h6）
-    
-    说明：
-    - 当header_dict为None或不是dict时，返回0
-    - 统计h1到h6所有等级标题的数量
-    """
-    if isinstance(header_dict, dict):
-        # 遍历h1到h6，求和所有等级的标题数量
-        return sum(header_dict.get(f'h{i}', 0) for i in range(1, 7))
-    return 0
-
-
-def extract_list_count(list_dict: dict | None) -> int:
-    """
-    从list_counts字典中提取列表总数。
-    
-    参数说明：
-    - list_dict：格式为 {'ordered': count, 'unordered': count} 的字典，
-                 或为None（表示无列表数据）
-    
-    返回值：有序列表和无序列表的总和
-    
-    说明：
-    - 当list_dict为None或不是dict时，返回0
-    - 统计ordered（有序）和unordered（无序）两种列表的数量
-    """
-    if isinstance(list_dict, dict):
-        # 有序列表(如1.2.3)和无序列表(如·项目符号)的总数
-        return list_dict.get('ordered', 0) + list_dict.get('unordered', 0)
-    return 0
-
-
-def extract_bold_count(bold_dict: dict | None) -> int:
-    """
-    从bold_counts字典中提取粗体总数。
-    
-    参数说明：
-    - bold_dict：格式为 {'**': count, '__': count} 的字典，
-                 或为None（表示无粗体数据）
-    
-    返回值：所有粗体标记的总数
-    
-    说明：
-    - 当bold_dict为None或不是dict时，返回0
-    - Markdown中粗体可用 ** 或 __ 表示，统计两种标记的总数
-    """
-    if isinstance(bold_dict, dict):
-        # ** 和 __ 都是粗体标记方式，统计两种的总数
-        return bold_dict.get('**', 0) + bold_dict.get('__', 0)
-    return 0
+FORMAT_CACHE_FILE = "format_data.parquet"
+FORMAT_REPORT_FILE = "R12_format_preference_report.txt"
+FORMAT_CHART_FILES = {
+    'presence': 'P05_01_format_presence_bar_chart.png',
+    'header_count': 'P05_02_header_count_line_chart.png',
+    'list_count': 'P05_03_list_count_line_chart.png',
+    'bold_count': 'P05_04_bold_count_line_chart.png',
+    'combination': 'P05_05_format_combination_bar_chart.png',
+}
+FORMAT_TABLE_FILES = {
+    'basic_statistics': 'T02_01_basic_statistics.csv',
+    'format_presence': 'T02_02_format_presence_analysis.csv',
+    'header_count': 'T02_03_header_count_analysis.csv',
+    'list_count': 'T02_04_list_count_analysis.csv',
+    'bold_count': 'T02_05_bold_count_analysis.csv',
+    'combination': 'T02_06_format_combination_analysis.csv',
+}
 
 
 
@@ -186,10 +71,7 @@ def prepare_format_data(df: pd.DataFrame) -> pd.DataFrame:
     参数说明：
     - df：优化后的数据框，需包含以下列：
         - winner: 评价结果
-        - a_header_count, b_header_count: 标题数（dict 格式）
-        - a_list_count, b_list_count: 列表数（dict 格式）
-        - a_bold_count, b_bold_count: 粗体数（dict 格式）
-        - a_tokens, b_tokens: 两模型输出 token 数
+        - metadata_a, metadata_b: 新 schema 下的格式与 token 元数据
         - model_a, model_b: 两个模型的名称
 
     返回值：扩展后的数据框，包含格式特征、密度特征和胜负标签
@@ -200,6 +82,10 @@ def prepare_format_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     print("准备格式特征数据...")
 
+    # 新 schema 将 token 与格式统计收纳到 metadata_a / metadata_b 中；
+    # 此处只在分析期解包为临时列，不回写 parquet。
+    df = with_flat_analysis_columns(df)
+
     # 1. 过滤掉"平局"评价，保留有明确胜负的评价
     win_df = df[~df['winner'].isin(['tie', 'both_bad'])].copy()
     original_rows = len(df)
@@ -209,13 +95,13 @@ def prepare_format_data(df: pd.DataFrame) -> pd.DataFrame:
 
     # 2. 提取格式计数（向量化，避免逐行 .iloc 循环）
     print("  提取格式特征...")
-    a_header = win_df['a_header_count'].apply(extract_header_count)
-    a_list   = win_df['a_list_count'].apply(extract_list_count)
-    a_bold   = win_df['a_bold_count'].apply(extract_bold_count)
+    a_header = win_df['a_header_count'].apply(safe_int_count)
+    a_list   = win_df['a_list_count'].apply(safe_int_count)
+    a_bold   = win_df['a_bold_count'].apply(safe_int_count)
 
-    b_header = win_df['b_header_count'].apply(extract_header_count)
-    b_list   = win_df['b_list_count'].apply(extract_list_count)
-    b_bold   = win_df['b_bold_count'].apply(extract_bold_count)
+    b_header = win_df['b_header_count'].apply(safe_int_count)
+    b_list   = win_df['b_list_count'].apply(safe_int_count)
+    b_bold   = win_df['b_bold_count'].apply(safe_int_count)
 
     # 3. 计算格式密度：count / (tokens + 1)，控制长度混淆
     a_tokens = win_df['a_tokens'].values
@@ -426,9 +312,7 @@ def analyze_count_feature(format_data: pd.DataFrame,
     """
     print(f"分析 {feature_name}...")
     
-    # ========================================================================
-    # 第一步：按feature值分组，计算每组的胜率和样本统计
-    # ========================================================================
+    # 第一步：按 feature 值分组，计算每组的胜率和样本统计
     # groupby的agg方法一次性计算多个聚合统计（比循环append更高效）
     count_stats = format_data.groupby(feature_name).agg({
         'is_winner': ['mean', 'count'],  # mean用于计算胜率，count用于样本数
@@ -437,16 +321,12 @@ def analyze_count_feature(format_data: pd.DataFrame,
     # 扁平化多级列名为单级（由groupby的agg产生）
     count_stats.columns = [feature_name, 'win_rate', 'sample_count']
     
-    # ========================================================================
     # 第二步：计算样本占比，用于评估统计可信度
-    # ========================================================================
     # 样本占比 = 该分组样本数 / 总样本数
     total_samples = count_stats['sample_count'].sum()
     count_stats['sample_proportion'] = count_stats['sample_count'] / total_samples
     
-    # ========================================================================
     # 第三步：过滤掉样本量过少的分组
-    # ========================================================================
     # 【为什么需要过滤】：
     # 样本少的分组胜率波动大，可能不代表真实趋势，而是随机波动
     # 例如：5个样本中恰好4个胜出，胜率80%，但这个结果不可靠
@@ -457,9 +337,7 @@ def analyze_count_feature(format_data: pd.DataFrame,
     if filtered_groups < original_groups:
         print(f"  按样本数过滤: {original_groups}组 → {filtered_groups}组 (阈值: {min_sample_count})")
     
-    # ========================================================================
-    # 第四步：找到最优的feature值（胜率最高的分组）
-    # ========================================================================
+    # 第四步：找到最优的 feature 值（胜率最高的分组）
     if len(count_stats) == 0:
         # 若全部被过滤，返回None值以示错误
         print(f"  WARNING: 所有分组都因样本不足被过滤，无法进行分析")
@@ -469,9 +347,7 @@ def analyze_count_feature(format_data: pd.DataFrame,
     best_count = count_stats.loc[best_idx, feature_name]
     best_win_rate = count_stats.loc[best_idx, 'win_rate']
     
-    # ========================================================================
     # 第五步：输出分析结果
-    # ========================================================================
     print(f"  分析分组数: {len(count_stats)}")
     print(f"  总样本量: {total_samples:,}")
     print(f"  最优{feature_name}: {best_count}, win_rate: {best_win_rate:.3f}")
@@ -545,9 +421,7 @@ def analyze_format_combinations(format_data: pd.DataFrame) -> pd.DataFrame:
     """
     print("分析 format_combination...")
     
-    # ========================================================================
-    # 第一步：定义8种互斥的格式组合条件
-    # ========================================================================
+    # 第一步：定义 8 种互斥的格式组合条件
     # 使用列表存储(条件, 标签)对，便于后续迭代处理
     conditions = [
         (format_data['has_list'] & ~format_data['has_header'] & ~format_data['has_bold'], 
@@ -568,9 +442,7 @@ def analyze_format_combinations(format_data: pd.DataFrame) -> pd.DataFrame:
          'without_any_format')
     ]
     
-    # ========================================================================
     # 第二步：为每个样本分配格式组合标签（使用 np.select 高效实现）
-    # ========================================================================
     # 【为什么用 np.select 而非逐行 .loc[condition]】：
     # - 逐行 .loc 对大 DataFrame 需要多次全量扫描，会产生 SettingWithCopyWarning
     # - np.select 一次性向量化处理，速度更快，语义更清晰
@@ -583,9 +455,7 @@ def analyze_format_combinations(format_data: pd.DataFrame) -> pd.DataFrame:
         conditions_list, labels_list, default='unknown'
     )
     
-    # ========================================================================
     # 第三步：按格式组合分组统计
-    # ========================================================================
     combination_stats = format_data_copy.groupby('format_combination').agg({
         'is_winner': ['mean', 'count'],
     }).reset_index()
@@ -593,21 +463,15 @@ def analyze_format_combinations(format_data: pd.DataFrame) -> pd.DataFrame:
     # 扁平化列名
     combination_stats.columns = ['format_combination', 'win_rate', 'sample_count']
     
-    # ========================================================================
     # 第四步：计算样本占比，用于评估数据代表性
-    # ========================================================================
     total_samples = combination_stats['sample_count'].sum()
     combination_stats['sample_proportion'] = combination_stats['sample_count'] / total_samples
     
-    # ========================================================================
     # 第五步：按胜率从高到低排序
-    # ========================================================================
     # 这样便于识别最优的格式组合
     combination_stats = combination_stats.sort_values('win_rate', ascending=False)
     
-    # ========================================================================
     # 第六步：输出分析结果
-    # ========================================================================
     print(f"  分析分组数: {len(combination_stats)}")
     print("\n  格式组合 vs 胜率 排名:")
     for idx, row in combination_stats.iterrows():
@@ -618,63 +482,55 @@ def analyze_format_combinations(format_data: pd.DataFrame) -> pd.DataFrame:
     return combination_stats
 
 
-
-# ========================================================================
-# 绘图函数：生成格式偏好分析的可视化图表
-# ========================================================================
+# 绘图函数
 
 def plot_presence_bar_chart(presence_df: pd.DataFrame, 
                            output_dir: Path | str | None = None) -> Path:
     """
     绘制格式存在性条形图。
-    
-    图表结构说明：
+
+    图表结构如下：
     - X轴：四种格式特征 (has_format, has_header, has_list, has_bold)
     - 左Y轴（红色）：有该格式时的胜率
     - 右Y轴（蓝色，已删除）：无该格式时的胜率
     - 使用并列条形比较，便于识别格式的有利程度
-    
-    图表元素说明：
+
+    图表元素如下：
     - 青色条形：有格式时的胜率（with_format_win_rate）
     - 红色条形：无格式时的胜率（without_format_win_rate）
     - X轴标签：四种格式类型
     - 网格线：便于读取精确数值
-    
+
     设计理念：
     - 并列条形设计：直观对比两种情况的胜率差异
     - 颜色编码：便于区分（与C14保持一致）
-    
+
     参数说明：
     - presence_df：格式存在性分析的统计数据框
     - output_dir：输出目录（默认为Pictures）
-    
-    返回值：保存的图表文件路径
+
+    返回值：
+    - 保存的图表文件路径
     """
     print("绘制格式存在性条形图...")
     
     # 参数标准化：支持Path或str，默认使用Pictures目录
     if output_dir is None:
-        output_dir = Path.cwd() / "Pictures"
+        output_dir = get_output_dir("picture")
     else:
         output_dir = Path(output_dir)
     
     # 前置检查：确保输出目录存在
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # ========================================================================
     # 第一步：创建图表和轴对象
-    # ========================================================================
     fig, ax = plt.subplots(1, 1, figsize=(14, 7))
-    
-    # ========================================================================
+
     # 第二步：配置数据和位置
-    # ========================================================================
     x = np.arange(len(presence_df))  # 标签的位置
     width = 0.35  # 条形宽度
-    
-    # ========================================================================
+
     # 第三步：绘制两组并列条形
-    # ========================================================================
     # 有格式时的胜率（青色）
     bars_with = ax.bar(x - width/2, presence_df['with_format_win_rate'], width, 
                        label='with_format', color='#4ECDC4', alpha=0.9)
@@ -682,9 +538,7 @@ def plot_presence_bar_chart(presence_df: pd.DataFrame,
     bars_without = ax.bar(x + width/2, presence_df['without_format_win_rate'], width, 
                           label='without_format', color='#FF6B6B', alpha=0.9)
     
-    # ========================================================================
     # 第三步（补充）：在每个条形顶部标注精确的胜率数值
-    # ========================================================================
     # 标注可以帮助读者直接读数，无需对照Y轴刻度
     for bar in bars_with:
         height = bar.get_height()
@@ -698,32 +552,24 @@ def plot_presence_bar_chart(presence_df: pd.DataFrame,
                 f'{height:.3f}', ha='center', va='bottom', fontsize=10,
                 color='#CC2200', fontweight='bold')
     
-    # ========================================================================
     # 第四步：配置轴标签和标题
-    # ========================================================================
     ax.set_xlabel('format_type', fontsize=14, fontweight='bold')
     ax.set_ylabel('win_rate', fontsize=14, fontweight='bold')
     ax.set_title("Format Preference Analysis - Format Presence vs Win Rate", 
                  fontsize=18, fontweight='bold')
     
-    # ========================================================================
     # 第五步：配置X轴刻度和标签
-    # ========================================================================
     ax.set_xticks(x)
     ax.set_xticklabels(presence_df['format_type'], fontsize=12)
     
-    # ========================================================================
     # 第六步：配置网格和图例
-    # ========================================================================
     ax.grid(True, linestyle='--', linewidth=1, alpha=0.6, color="#FF8888", axis='y')
     ax.legend(fontsize=12, loc='upper right')
     
-    # ========================================================================
     # 第七步：保存和关闭
-    # ========================================================================
     plt.tight_layout()
     
-    chart_path = get_chart_output_path('presence', output_dir.parent)
+    chart_path = output_dir / FORMAT_CHART_FILES['presence']
     plt.savefig(chart_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
     
@@ -742,16 +588,16 @@ def plot_count_feature_line_chart(count_stats: pd.DataFrame,
                                  output_filename: str | None = None) -> Path:
     """
     通用的计数特征折线图绘制函数。
-    
+
     本函数是对plot_header_count_line_chart、plot_list_count_line_chart、
     plot_bold_count_line_chart的统一实现，避免了大量代码重复。
-    
-    图表结构说明：
+
+    图表结构如下：
     - 左轴（Y1，红色）：模型的胜率 win_rate，范围[0.3, 0.7]
     - 右轴（Y2，青色）：样本占比 sample_proportion，范围[0, max*1.1]
     - X轴：计数特征的值（如标题数、列表数、粗体数）
-    
-    图表元素说明：
+
+    图表元素如下：
     - 红色折线 + 圆点：胜率曲线
     - 青色虚线 + 方点：样本占比曲线
     - 黄色竖线：最优值位置
@@ -778,11 +624,9 @@ def plot_count_feature_line_chart(count_stats: pd.DataFrame,
     """
     print(f"绘制 {feature_name} 折线图...")
     
-    # ========================================================================
     # 第一步：参数标准化、目录准备和边界条件检查
-    # ========================================================================
     if output_dir is None:
-        output_dir = Path.cwd() / "Pictures"
+        output_dir = get_output_dir("picture")
     else:
         output_dir = Path(output_dir)
     
@@ -792,9 +636,9 @@ def plot_count_feature_line_chart(count_stats: pd.DataFrame,
     if output_filename is None:
         # 映射关系：同一脚本内的计数折线图统一使用 P05_02 ~ P05_04 组号。
         name_map = {
-            'header_count': get_chart_output_path('header_count', output_dir.parent).name,
-            'list_count': get_chart_output_path('list_count', output_dir.parent).name,
-            'bold_count': get_chart_output_path('bold_count', output_dir.parent).name,
+            'header_count': FORMAT_CHART_FILES['header_count'],
+            'list_count': FORMAT_CHART_FILES['list_count'],
+            'bold_count': FORMAT_CHART_FILES['bold_count'],
         }
         output_filename = name_map.get(feature_name, f'P__{feature_name}_line_chart.png')
     
@@ -809,14 +653,10 @@ def plot_count_feature_line_chart(count_stats: pd.DataFrame,
     # 传入的 best_count/best_win_rate 会是 None，此时只绘制折线，跳过最优点标注
     has_best = (best_count is not None) and (best_win_rate is not None)
     
-    # ========================================================================
     # 第二步：创建图表和双轴对象
-    # ========================================================================
     fig, ax1 = plt.subplots(figsize=(12, 6))
-    
-    # ========================================================================
+
     # 第三步：配置左轴（Y1，红色，胜率）
-    # ========================================================================
     color1 = '#FF6B6B'  # 红色，代表胜率
     
     # 设置X轴标签和范围
@@ -834,9 +674,7 @@ def plot_count_feature_line_chart(count_stats: pd.DataFrame,
              color=color1, marker='o', linewidth=3, markersize=8,
              label='win_rate', markerfacecolor='white', markeredgewidth=2)
     
-    # ========================================================================
     # 第四步：配置右轴（Y2，青色，样本占比）
-    # ========================================================================
     color2 = '#4ECDC4'  # 青色，代表样本分布
     
     ax2 = ax1.twinx()  # 创建共享x轴的右轴
@@ -851,9 +689,7 @@ def plot_count_feature_line_chart(count_stats: pd.DataFrame,
              color=color2, marker='s', linestyle='--', linewidth=3, markersize=8,
              label='sample_proportion', markerfacecolor='white', markeredgewidth=2)
     
-    # ========================================================================
     # 第五步：标注最优点（仅在 best_count/best_win_rate 有效时执行）
-    # ========================================================================
     if has_best:
         # 在最优点处绘制星形标记（黄色）
         ax1.plot(best_count, best_win_rate, 'r*', color='#FFD166', markersize=18, 
@@ -883,9 +719,7 @@ def plot_count_feature_line_chart(count_stats: pd.DataFrame,
                      fontsize=12, ha='center', va='bottom',
                      bbox=dict(boxstyle='round,pad=0.5', facecolor='#FFF9C4'))
     
-    # ========================================================================
     # 第六步：添加趋势线（二次多项式拟合）
-    # ========================================================================
     # 二次多项式能捕捉非线性的倒U形或U形关系
     # 【防护】：polyfit 至少需要 3 个数据点才能拟合二次多项式，否则跳过
     if len(count_stats) >= 3:
@@ -895,9 +729,7 @@ def plot_count_feature_line_chart(count_stats: pd.DataFrame,
                               count_stats[feature_name].max(), 100)
         ax1.plot(x_smooth, p(x_smooth), color="#FF5353", linewidth=3, alpha=0.6, label='trend_line')
     
-    # ========================================================================
     # 第七步：配置图例和标题
-    # ========================================================================
     # 左轴的图例
     handles1, labels1 = ax1.get_legend_handles_labels()
     ax1.legend(handles1, labels1, loc='upper left', fontsize=12)
@@ -910,15 +742,11 @@ def plot_count_feature_line_chart(count_stats: pd.DataFrame,
     title = f"Format Preference Analysis - {feature_name} vs Win Rate & Sample Proportion"
     ax1.set_title(title, fontsize=16, fontweight='bold')
     
-    # ========================================================================
     # 第八步：配置网格线
-    # ========================================================================
     ax1.grid(True, which='major', linestyle='--', linewidth=1, alpha=0.3, color="#FF8888")
     ax2.grid(True, which='major', linestyle='--', linewidth=1, alpha=0.3, color="#AED1FF")
     
-    # ========================================================================
     # 第九步：保存和关闭
-    # ========================================================================
     plt.tight_layout()
     
     chart_path = output_dir / output_filename
@@ -942,7 +770,7 @@ def plot_header_count_line_chart(header_stats: pd.DataFrame,
     """
     return plot_count_feature_line_chart(header_stats, 'header_count',
                                         best_header_count, best_header_win_rate,
-                                        output_dir, get_chart_output_path('header_count', Path(output_dir).parent if output_dir is not None else None).name)
+                                        output_dir, FORMAT_CHART_FILES['header_count'])
 
 
 def plot_list_count_line_chart(list_stats: pd.DataFrame, 
@@ -956,7 +784,7 @@ def plot_list_count_line_chart(list_stats: pd.DataFrame,
     """
     return plot_count_feature_line_chart(list_stats, 'list_count',
                                         best_list_count, best_list_win_rate,
-                                        output_dir, get_chart_output_path('list_count', Path(output_dir).parent if output_dir is not None else None).name)
+                                        output_dir, FORMAT_CHART_FILES['list_count'])
 
 
 def plot_bold_count_line_chart(bold_stats: pd.DataFrame, 
@@ -970,7 +798,7 @@ def plot_bold_count_line_chart(bold_stats: pd.DataFrame,
     """
     return plot_count_feature_line_chart(bold_stats, 'bold_count',
                                         best_bold_count, best_bold_win_rate,
-                                        output_dir, get_chart_output_path('bold_count', Path(output_dir).parent if output_dir is not None else None).name)
+                                        output_dir, FORMAT_CHART_FILES['bold_count'])
 
 
 
@@ -978,81 +806,68 @@ def plot_combination_bar_chart(combination_stats: pd.DataFrame,
                               output_dir: Path | str | None = None) -> Path:
     """
     绘制格式组合条形图。
-    
-    图表结构说明：
+
+    图表结构如下：
     - X轴：8种格式组合（按胜率从高到低排序）
     - Y轴：该组合的平均胜率
     - 条形颜色：使用color bar，从黄到红渐变，反映胜率的高低
     - 条形标签：在顶部显示精确胜率和样本数
-    
-    图表元素说明：
+
+    图表元素如下：
     - 条形颜色：黄->橙->红渐变，黄色表示高胜率，红色表示低胜率
     - X轴标签：各种格式组合（字体旋转45度便于阅读）
     - 条形顶部标注：显示精确的胜率和样本数量
     - 网格线：仅Y轴方向，便于读取数值
-    
+
     设计理念：
     - 颜色编码：直观反映胜率的相对大小
     - 样本数标注：提醒用户某些组合可能样本不足
     - 排序设计：从高到低排序，便于识别"最佳实践"
-    
+
     参数说明：
     - combination_stats：格式组合分析的统计数据框
     - output_dir：输出目录（默认为Pictures）
-    
-    返回值：保存的图表文件路径
+
+    返回值：
+    - 保存的图表文件路径
     """
     print("绘制格式组合条形图...")
     
     # 参数标准化：支持Path或str，默认使用Pictures目录
     if output_dir is None:
-        output_dir = Path.cwd() / "Pictures"
+        output_dir = get_output_dir("picture")
     else:
         output_dir = Path(output_dir)
     
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # ========================================================================
-    # 第一步：选择前8个组合（如果有）
-    # ========================================================================
+    # 第一步：选择前 8 个组合（如果有）
     # 通常有8种互斥的组合，全部显示；若数据不足，显示可用的
     display_stats = combination_stats.head(8).copy()
     
-    # ========================================================================
     # 第二步：创建图表对象
-    # ========================================================================
     fig, ax = plt.subplots(figsize=(14, 6))
     
-    # ========================================================================
-    # 第三步：绘制条形图，使用color bar进行胜率编码
-    # ========================================================================
+    # 第三步：绘制条形图，使用 color bar 进行胜率编码
     # YlOrRd色盘：Yellow -> Orange -> Red，黄色表示高胜率，红色表示低胜率
     bars = ax.bar(range(len(display_stats)), display_stats['win_rate'], 
                   color=plt.cm.YlOrRd(display_stats['win_rate'] / display_stats['win_rate'].max()))
     
-    # ========================================================================
     # 第四步：配置坐标轴标签和标题
-    # ========================================================================
     ax.set_xlabel('format_combination', fontsize=12, fontweight='bold')
     ax.set_ylabel('win_rate', fontsize=12, fontweight='bold')
     ax.set_title("Format Preference Analysis - Format Combination vs Win Rate", 
                  fontsize=14, fontweight='bold')
     
-    # ========================================================================
-    # 第五步：配置X轴刻度和标签
-    # ========================================================================
+    # 第五步：配置 X 轴刻度和标签
     ax.set_xticks(range(len(display_stats)))
     # 旋转45度，向右对齐，便于长标签的阅读
     ax.set_xticklabels(display_stats['format_combination'], rotation=45, ha='right', fontsize=10)
     
-    # ========================================================================
     # 第六步：配置网格线
-    # ========================================================================
     ax.grid(True, alpha=0.3, axis='y', linestyle='--', linewidth=1)
     
-    # ========================================================================
     # 第七步：在条形顶部添加数值标注
-    # ========================================================================
     # 标注包含：胜率（百分比）和样本数量，帮助用户理解数据
     for i, (bar, row) in enumerate(zip(bars, display_stats.itertuples())):
         height = bar.get_height()  # 条形高度（胜率）
@@ -1061,12 +876,10 @@ def plot_combination_bar_chart(combination_stats: pd.DataFrame,
                 f'{height:.3f}\n(n={int(row.sample_count)})',
                 ha='center', va='bottom', fontsize=9)
     
-    # ========================================================================
     # 第八步：保存和关闭
-    # ========================================================================
     plt.tight_layout()
     
-    chart_path = get_chart_output_path('combination', output_dir.parent)
+    chart_path = output_dir / FORMAT_CHART_FILES['combination']
     plt.savefig(chart_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
     
@@ -1089,7 +902,7 @@ def create_summary_tables(format_data: pd.DataFrame,
     
     本函数将各个分析阶段的结果导出为格式化的CSV表格，便于后续的报告生成和数据分析。
     
-    生成的CSV文件说明：
+        生成的 CSV 文件如下：
         - T02_01_basic_statistics.csv：基本统计信息
       * 各格式特征的描述性统计（均值、标准差、最小值等）
         - T02_02_format_presence_analysis.csv：格式存在性分析
@@ -1122,59 +935,47 @@ def create_summary_tables(format_data: pd.DataFrame,
     
     # 参数标准化：支持Path或str，默认使用Tables目录
     if output_dir is None:
-        output_dir = Path.cwd() / "Tables"
+        output_dir = get_output_dir("table")
     else:
         output_dir = Path(output_dir)
     
     # 前置检查：确保输出目录存在
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # ========================================================================
-    # 第一步：生成基本统计表（描述性统计）
-    # ========================================================================
+    # 1. 生成基本统计表
     # 对关键的数值列进行描述性统计（均值、标准差、分位数等）
     basic_stats = format_data[['list_count', 'header_count', 'bold_count', 'total_format']].describe()
-    basic_stats_path = get_table_output_path('basic_statistics', output_dir.parent)
+    basic_stats_path = output_dir / FORMAT_TABLE_FILES['basic_statistics']
     basic_stats.to_csv(basic_stats_path, encoding='utf-8-sig')
     print(f"  已保存: {basic_stats_path.name}")
-    
-    # ========================================================================
-    # 第二步：保存格式存在性分析表
-    # ========================================================================
+
+    # 2. 保存格式存在性分析表
     # 包含：有/无格式时的胜率、样本数、占比等
-    presence_path = get_table_output_path('format_presence', output_dir.parent)
+    presence_path = output_dir / FORMAT_TABLE_FILES['format_presence']
     presence_df.to_csv(presence_path, index=False, encoding='utf-8-sig')
     print(f"  已保存: {presence_path.name}")
-    
-    # ========================================================================
-    # 第三步：保存标题数分析表（如果非空）
-    # ========================================================================
+
+    # 3. 保存标题数分析表
     if len(header_stats) > 0:
-        header_path = get_table_output_path('header_count', output_dir.parent)
+        header_path = output_dir / FORMAT_TABLE_FILES['header_count']
         header_stats.to_csv(header_path, index=False, encoding='utf-8-sig')
         print(f"  已保存: {header_path.name}")
-    
-    # ========================================================================
-    # 第四步：保存列表数分析表（如果非空）
-    # ========================================================================
+
+    # 4. 保存列表数分析表
     if len(list_stats) > 0:
-        list_path = get_table_output_path('list_count', output_dir.parent)
+        list_path = output_dir / FORMAT_TABLE_FILES['list_count']
         list_stats.to_csv(list_path, index=False, encoding='utf-8-sig')
         print(f"  已保存: {list_path.name}")
-    
-    # ========================================================================
-    # 第五步：保存粗体数分析表（如果非空）
-    # ========================================================================
+
+    # 5. 保存粗体数分析表
     if len(bold_stats) > 0:
-        bold_path = get_table_output_path('bold_count', output_dir.parent)
+        bold_path = output_dir / FORMAT_TABLE_FILES['bold_count']
         bold_stats.to_csv(bold_path, index=False, encoding='utf-8-sig')
         print(f"  已保存: {bold_path.name}")
-    
-    # ========================================================================
-    # 第六步：保存格式组合分析表（如果非空）
-    # ========================================================================
+
+    # 6. 保存格式组合分析表
     if len(combination_stats) > 0:
-        combo_path = get_table_output_path('combination', output_dir.parent)
+        combo_path = output_dir / FORMAT_TABLE_FILES['combination']
         combination_stats.to_csv(combo_path, index=False, encoding='utf-8-sig')
         print(f"  已保存: {combo_path.name}")
     
@@ -1220,12 +1021,12 @@ def generate_analysis_report(format_data: pd.DataFrame,
     print(f"生成分析报告（{section_tag}）...")
 
     if output_dir is None:
-        output_dir = Path.cwd() / "Reports"
+        output_dir = get_output_dir("report")
     else:
         output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    report_path = output_dir / "R12_format_preference_report.txt"
+    report_path = output_dir / FORMAT_REPORT_FILE
 
     with open(report_path, mode, encoding='utf-8') as f:
 
@@ -1307,26 +1108,20 @@ if __name__ == "__main__":
     print("=" * 80)
 
     # 1. 初始化路径
-    data_file_path = get_optimized_parquet_path()
-    charts_dir  = Path.cwd() / "Pictures"
-    reports_dir = Path.cwd() / "Reports"
-    tables_dir  = Path.cwd() / "Tables"
+    data_file_path = get_data_path("optimized")
+    charts_dir  = get_output_dir("picture")
+    reports_dir = get_output_dir("report")
+    tables_dir  = get_output_dir("table")
     for d in (charts_dir, reports_dir, tables_dir):
         d.mkdir(parents=True, exist_ok=True)
 
     # 2. 加载数据
-    # 检查输入文件是否存在
-    if not data_file_path.exists():
+    df = load_parquet_or_none(data_file_path)
+    if df is None:
         print(f"ERROR: 输入文件不存在 - {data_file_path}")
         print("请确保已运行 C12_optimize_data.py 生成优化数据")
         exit(1)
-
-    try:
-        df = pd.read_parquet(data_file_path)
-        print(f"  数据加载成功，形状: {df.shape[0]:,} × {df.shape[1]}")
-    except Exception as exc:
-        print(f"ERROR: 数据加载失败 - {exc}")
-        exit(1)
+    print(f"  数据加载成功，形状: {df.shape[0]:,} × {df.shape[1]}")
 
     # 1. 全量分析
     print("\n" + "-" * 40)
@@ -1336,7 +1131,7 @@ if __name__ == "__main__":
     format_data = prepare_format_data(df)
 
     # 1.1 缓存解缠化结果
-    format_data_path = get_format_data_path()
+    format_data_path = get_data_path("format", FORMAT_CACHE_FILE)
     format_data_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         format_data.to_parquet(format_data_path, index=False)
@@ -1385,7 +1180,7 @@ if __name__ == "__main__":
         ("math_true_data.parquet",            "MATH（数学）"),
         ("code_true_data.parquet",            "CODE（代码）"),
     ]
-    subset_dir = Path.cwd() / "Data" / "optimized_data"
+    subset_dir = get_data_dir("subsets")
 
     for filename, tag in subset_configs:
         subset_path = subset_dir / filename

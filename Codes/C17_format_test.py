@@ -1,23 +1,16 @@
 """
 C17_format_test
 
-对优化数据集及各任务类别子集执行格式偏好 Wilcoxon 符号秩检验。
+对优化数据集及各任务类别子集执行格式偏好检验。
 
-假设（每种格式特征 f ∈ {header, list, bold}）：
-  H₀: median(Δᵢ) = 0
-  H₁: median(Δᵢ) > 0
-  其中 Δᵢ = count_f(获胜模型) − count_f(落败模型)
-
-辅助假设（格式密度，控制长度混淆）：
-  Δᵢ_density = count_f(winner)/(tokens_winner+1) − count_f(loser)/(tokens_loser+1)
-
-仅保留 winner ∈ {model_a, model_b} 的行（排除 tie、both_bad）。
-多重比较：每子集内 3 个特征做 Bonferroni 校正（k=3）。
+功能：
+- 对标题、列表、粗体三类格式特征执行 Wilcoxon 检验
+- 辅助计算格式密度检验和存在性卡方检验
+- 生成汇总表、热力图和文本报告
 
 数据流向：
-    Data/optimized_data/  →  Wilcoxon + 卡方 + 密度检验  →  Reports/R14_format_test_report.txt
-                                                                                                                Tables/T19_format_test_summary.csv
-                                                                                                                Pictures/P13_format_effect_heatmaps.png
+    optimized_data.parquet 与 C13 子集 parquet → 格式计数与密度检验 → Tables/T19_format_test_summary.csv
+    + Reports/R14_format_test_report.txt + Pictures/P13_format_effect_heatmaps.png
 """
 
 import matplotlib.pyplot as plt
@@ -27,55 +20,15 @@ from pathlib import Path
 from scipy.stats import wilcoxon, chi2_contingency
 from typing import Dict, List, Optional, Tuple
 
-
-def get_data_dir(root: Path | str | None = None) -> Path:
-    """返回优化数据目录的默认路径。"""
-    if root is None:
-        return Path.cwd() / "Data" / "optimized_data"
-    return Path(root) / "Data" / "optimized_data"
-
-
-def get_report_path(root: Path | str | None = None) -> Path:
-    """返回 R14 报告路径。"""
-    if root is None:
-        root = Path.cwd()
-    return Path(root) / "Reports" / "R14_format_test_report.txt"
-
-
-def get_table_path(root: Path | str | None = None) -> Path:
-    """返回 C17 汇总表路径。"""
-    if root is None:
-        root = Path.cwd()
-    return Path(root) / "Tables" / "T19_format_test_summary.csv"
-
-
-def get_picture_path(root: Path | str | None = None) -> Path:
-    """返回 C17 主图路径。"""
-    if root is None:
-        root = Path.cwd()
-    return Path(root) / "Pictures" / "P13_format_effect_heatmaps.png"
-
-
-SUBSETS: List[Tuple[str, str]] = [
-    ("全量",             "optimized_data.parquet"),
-    # 16 个纯净分区（互不重叠，完整覆盖全量）
-    ("无类别",           "no_category_data.parquet"),
-    ("仅创意写作",       "only_cw_data.parquet"),
-    ("仅指令遵循",       "only_if_data.parquet"),
-    ("仅数学",           "only_math_data.parquet"),
-    ("仅代码",           "only_code_data.parquet"),
-    ("创意+指令",        "cw_if_data.parquet"),
-    ("创意+数学",        "cw_math_data.parquet"),
-    ("创意+代码",        "cw_code_data.parquet"),
-    ("指令+数学",        "if_math_data.parquet"),
-    ("指令+代码",        "if_code_data.parquet"),
-    ("数学+代码",        "math_code_data.parquet"),
-    ("创意+指令+数学",   "cw_if_math_data.parquet"),
-    ("创意+指令+代码",   "cw_if_code_data.parquet"),
-    ("创意+数学+代码",   "cw_math_code_data.parquet"),
-    ("指令+数学+代码",   "if_math_code_data.parquet"),
-    ("四类全含",         "all_categories_data.parquet"),
-]
+from accessor import (
+    get_analysis_subset_paths,
+    get_data_path,
+    get_output_path,
+    oriented_winner_density_difference,
+    oriented_winner_difference,
+    safe_int_count,
+    with_flat_analysis_columns,
+)
 
 SUBSET_LABELS_EN = {
     "全量": "Full",
@@ -103,35 +56,25 @@ N_BOOTSTRAP = 1000
 BONFERRONI_K = len(FEATURES)
 
 
-def _dict_sum(value) -> int:
-    """将格式计数字段（dict 或数值）转换为整数总计。"""
-    if isinstance(value, dict):
-        return int(sum(value.values()))
-    if value is None or (isinstance(value, float) and np.isnan(value)):
-        return 0
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return 0
-
-
 def _build_paired(df: pd.DataFrame, feature: str
                   ) -> Tuple[np.ndarray, np.ndarray]:
     """构造格式计数差值和格式密度差值数组。"""
     a_col = f"a_{feature}_count"
     b_col = f"b_{feature}_count"
 
-    a_cnt = df[a_col].apply(_dict_sum).values.astype(np.float64)
-    b_cnt = df[b_col].apply(_dict_sum).values.astype(np.float64)
+    a_cnt = df[a_col].apply(safe_int_count).values.astype(np.float64)
+    b_cnt = df[b_col].apply(safe_int_count).values.astype(np.float64)
     a_tok = df["a_tokens"].values.astype(np.float64)
     b_tok = df["b_tokens"].values.astype(np.float64)
 
-    winner_is_a = (df["winner"] == "model_a").values
-
-    count_diff = np.where(winner_is_a, a_cnt - b_cnt, b_cnt - a_cnt)
-    a_den = a_cnt / (a_tok + 1)
-    b_den = b_cnt / (b_tok + 1)
-    density_diff = np.where(winner_is_a, a_den - b_den, b_den - a_den)
+    count_diff = oriented_winner_difference(a_cnt, b_cnt, df["winner"].values)
+    density_diff = oriented_winner_density_difference(
+        a_cnt,
+        b_cnt,
+        a_tok,
+        b_tok,
+        df["winner"].values,
+    )
 
     return count_diff, density_diff
 
@@ -183,7 +126,8 @@ def _cohens_d(arr: np.ndarray) -> Tuple[float, float]:
     参数说明：
     - arr：差值数组（含零值）
 
-    返回值：(cohen_d, hedges_g)；非零样本 < 3 时返回 (nan, nan)。
+    返回值：
+    - (cohen_d, hedges_g)；非零样本 < 3 时返回 (nan, nan)
     """
     nonzero = arr[arr != 0]
     n = len(nonzero)
@@ -198,8 +142,8 @@ def _chisquare_presence(df: pd.DataFrame, feature: str) -> Optional[float]:
     """对"胜者有格式 vs 败者有格式"构造列联表并执行卡方检验，返回 p 值。"""
     a_col = f"a_{feature}_count"
     b_col = f"b_{feature}_count"
-    a_cnt = df[a_col].apply(_dict_sum)
-    b_cnt = df[b_col].apply(_dict_sum)
+    a_cnt = df[a_col].apply(safe_int_count)
+    b_cnt = df[b_col].apply(safe_int_count)
     winner_is_a = (df["winner"] == "model_a").values
     win_has = np.where(winner_is_a, a_cnt > 0, b_cnt > 0).astype(int)
     los_has = np.where(winner_is_a, b_cnt > 0, a_cnt > 0).astype(int)
@@ -222,8 +166,11 @@ def run_one_subset(label: str, df: pd.DataFrame) -> Optional[Dict]:
     - label：子集标签
     - df：已过滤（只含 model_a/model_b winner）的子集
 
-    返回：结果字典，样本不足则返回 None。
+    返回值：
+    - 结果字典；样本不足时返回 None
     """
+    df = with_flat_analysis_columns(df)
+
     n_total = len(df)
     if n_total < MIN_PAIRS:
         print(f"  [{label}] 有效对数 {n_total} < {MIN_PAIRS}，跳过")
@@ -372,30 +319,39 @@ def run_format_test(data_dir: Path | str | None = None,
     对所有预定义子集执行格式偏好检验并生成报告。
 
     参数说明：
-    - data_dir：子集 parquet 文件目录（默认为 Data/optimized_data）
+    - data_dir：子集 parquet 文件目录（默认为 Data/subsets）
     - report_dir：报告保存目录（默认为 Reports）
     - table_dir：汇总表保存目录（默认为 Tables）
     - picture_dir：图片保存目录（默认为 Pictures）
+
+    返回值：
+    - 输出文件路径字典；若无有效结果则返回 None
     """
     root = Path.cwd()
+    default_subset_paths = get_analysis_subset_paths(root)
+    optimized_file_path = get_data_path("optimized", root=root)
 
     if data_dir is None:
-        data_dir = get_data_dir()
+        subset_paths = default_subset_paths
     else:
-        data_dir = Path(data_dir)
+        subset_root = Path(data_dir)
+        subset_paths = {
+            label: optimized_file_path if label == "全量" else subset_root / path.name
+            for label, path in default_subset_paths.items()
+        }
 
     if report_dir is None:
-        report_dir = get_report_path(root).parent
+        report_dir = get_output_path("report", "R14_format_test_report.txt", root).parent
     else:
         report_dir = Path(report_dir)
 
     if table_dir is None:
-        table_path = get_table_path(root)
+        table_path = get_output_path("table", "T19_format_test_summary.csv", root)
     else:
         table_path = Path(table_dir) / "T19_format_test_summary.csv"
 
     if picture_dir is None:
-        picture_path = get_picture_path(root)
+        picture_path = get_output_path("picture", "P13_format_effect_heatmaps.png", root)
     else:
         picture_path = Path(picture_dir) / "P13_format_effect_heatmaps.png"
 
@@ -409,15 +365,12 @@ def run_format_test(data_dir: Path | str | None = None,
     print("C17 格式偏好 Wilcoxon 符号秩检验（含密度辅助 + 卡方存在性）")
     print("=" * 80)
 
-    for label, filename in SUBSETS:
-        fpath = data_dir / filename
+    for label, fpath in subset_paths.items():
         if not fpath.exists():
             print(f"  [{label}] 文件不存在，跳过：{fpath}")
             continue
 
-        need_cols = ["winner", "a_tokens", "b_tokens",
-                     "a_header_count", "a_list_count", "a_bold_count",
-                     "b_header_count", "b_list_count", "b_bold_count"]
+        need_cols = ["winner", "metadata_a", "metadata_b"]
         df_raw = pd.read_parquet(fpath, columns=need_cols)
         df = df_raw[df_raw["winner"].isin(["model_a", "model_b"])].copy()
         print(f"\n[{label}]  总行数={len(df_raw):,}  有效对数={len(df):,}")

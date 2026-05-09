@@ -1,10 +1,10 @@
 """
 C13_divide_subset
 
-按任务类别布尔字段将优化数据集划分为分析子集。
+按嵌套任务类别字段将优化数据集划分为分析子集。
 
 功能：
-- 依据 creative_writing_bool、if_bool、math_bool、code_bool 四列划分子集
+- 依据 category_tag 内的 cw、if、math、code 四个布尔字段划分子集
 - 生成四类单一类别子集（含该类别的全部行，4 个）
 - 生成互不重叠的纯净分区（4^2 完全枚举）：
     · 独立类（exactly one True）：   4 个
@@ -16,7 +16,7 @@ C13_divide_subset
 - 将各子集保存为独立 parquet 文件
 
 数据流向：
-  optimized_data.parquet（108,171 行）→ 布尔掩码分组 → 子集 parquet 文件
+    optimized_data.parquet（108,171 行）→ 布尔掩码分组 → Data/subsets/*.parquet
   + Reports/R10_division_report.txt
 """
 
@@ -24,64 +24,77 @@ import pandas as pd
 from pathlib import Path
 from typing import Dict
 
+from accessor import get_data_dir, get_data_path, get_output_dir
 
-def get_optimized_parquet_path(root: Path | str | None = None) -> Path:
-    """返回优化数据 parquet 文件的默认路径。"""
-
-    if root is None:
-        root_path = Path.cwd()
-    else:
-        root_path = Path(root)
-
-    return root_path / "Data" / "optimized_data" / "optimized_data.parquet"
+# 四个分类字段的简写，便于后续枚举引用
+_SHORT = ["cw", "if", "math", "code"]
 
 
-# ---------------------------------------------------------------------------
-# 四个布尔列的简写，方便后续枚举引用
-# ---------------------------------------------------------------------------
-_BOOLS = ["creative_writing_bool", "if_bool", "math_bool", "code_bool"]
-_SHORT = ["cw", "if", "math", "code"]  # 对应的文件名简写
-
-
-def _exact_mask(df: pd.DataFrame, true_cols: list[str]) -> "pd.Series[bool]":
+def _extract_category_flags(df: pd.DataFrame) -> pd.DataFrame:
     """
-    生成精确掩码：true_cols 中的列为 True，其余三列为 False。
+    从 category_tag 嵌套字段中提取四个分类布尔值。
 
     参数说明：
-    - df：完整 DataFrame
-    - true_cols：需要为 True 的列名列表（从 _BOOLS 中选取）
+    - df：完整 DataFrame，要求包含 category_tag 列
 
-    返回：布尔 Series
+    返回值：
+    - 含 cw / if / math / code 四列的布尔 DataFrame
     """
-    mask = pd.Series([True] * len(df), index=df.index)
-    for col in _BOOLS:
-        if col in true_cols:
-            mask &= df[col] == True
+
+    default_flags = {key: False for key in _SHORT}
+
+    extracted = df["category_tag"].apply(
+        lambda value: {key: bool(value.get(key, False)) for key in _SHORT}
+        if isinstance(value, dict)
+        else default_flags.copy()
+    )
+
+    return pd.DataFrame(list(extracted), index=df.index).astype(bool)
+
+
+def _exact_mask(category_flags: pd.DataFrame, true_keys: list[str]) -> "pd.Series[bool]":
+    """
+    生成精确掩码：true_keys 中的列为 True，其余三列为 False。
+
+    参数说明：
+    - category_flags：由 _extract_category_flags 生成的布尔 DataFrame
+    - true_keys：需要为 True 的字段名列表（从 _SHORT 中选取）
+
+    返回值：
+    - 布尔 Series
+    """
+    mask = pd.Series([True] * len(category_flags), index=category_flags.index)
+    for key in _SHORT:
+        if key in true_keys:
+            mask &= category_flags[key] == True
         else:
-            mask &= df[col] == False
+            mask &= category_flags[key] == False
     return mask
 
 
-def create_single_category_subsets(df: pd.DataFrame, output_dir: Path) -> Dict[str, int]:
+def create_single_category_subsets(df: pd.DataFrame,
+                                   category_flags: pd.DataFrame,
+                                   output_dir: Path) -> Dict[str, int]:
     """
     创建单一分类子集（含该类别的全部行，不排除与其他类别的重叠）。
 
     四类：creative_writing / if / math / code，各取 bool=True 的行。
     用于"某类任务中的偏好分析"，允许与其他类别重叠。
 
-    返回：{'subset_name': row_count, ...}
+    返回值：
+    - {'subset_name': row_count, ...}
     """
     subset_stats = {}
 
     pairs = [
-        ("creative_writing_bool", "creative_writing_true"),
-        ("if_bool",               "if_true"),
-        ("math_bool",             "math_true"),
-        ("code_bool",             "code_true"),
+        ("cw",   "creative_writing_true"),
+        ("if",   "if_true"),
+        ("math", "math_true"),
+        ("code", "code_true"),
     ]
 
-    for col, name in pairs:
-        sub = df[df[col] == True].copy()
+    for key, name in pairs:
+        sub = df[category_flags[key] == True].copy()
         sub.to_parquet(output_dir / f"{name}_data.parquet", index=False)
         subset_stats[name] = len(sub)
         print(f"  {name}: {len(sub):,} 行")
@@ -89,7 +102,9 @@ def create_single_category_subsets(df: pd.DataFrame, output_dir: Path) -> Dict[s
     return subset_stats
 
 
-def create_exclusive_subsets(df: pd.DataFrame, output_dir: Path) -> Dict[str, int]:
+def create_exclusive_subsets(df: pd.DataFrame,
+                             category_flags: pd.DataFrame,
+                             output_dir: Path) -> Dict[str, int]:
     """
     创建互不重叠的纯净分区（完全枚举 2^4 = 16 个非空组合）。
 
@@ -102,7 +117,8 @@ def create_exclusive_subsets(df: pd.DataFrame, output_dir: Path) -> Dict[str, in
     - 四交集：all_categories
     - 无类别：no_category
 
-    返回：{'subset_name': row_count, ...}
+    返回值：
+    - {'subset_name': row_count, ...}
     """
     subset_stats = {}
 
@@ -133,8 +149,8 @@ def create_exclusive_subsets(df: pd.DataFrame, output_dir: Path) -> Dict[str, in
     combos.append(([0, 1, 2, 3], "all_categories"))
 
     for true_indices, name in combos:
-        true_cols = [_BOOLS[i] for i in true_indices]
-        mask = _exact_mask(df, true_cols)
+        true_keys = [_SHORT[i] for i in true_indices]
+        mask = _exact_mask(category_flags, true_keys)
         sub = df[mask].copy()
         sub.to_parquet(output_dir / f"{name}_data.parquet", index=False)
         subset_stats[name] = len(sub)
@@ -155,25 +171,32 @@ def divide_data_by_category(file_path: Path | str | None = None,
 
     参数说明：
     - file_path：优化数据文件路径（默认为 Data/optimized_data/optimized_data.parquet）
-    - data_dir：子集数据保存目录（默认为 Data/optimized_data）
+    - data_dir：子集数据保存目录（默认为 Data/subsets）
     - report_dir：报告保存目录（默认为 Reports）
+
+    返回值：
+    - 无返回值，直接输出子集 parquet 文件和划分报告
     """
 
+    # 支持传入自定义文件路径，便于测试或在不同目录下运行脚本
     if file_path is None:
-        file_path = get_optimized_parquet_path()
+        file_path = get_data_path("optimized")
     else:
         file_path = Path(file_path)
 
+    # 默认数据输出目录为当前工作目录下的 Data/subsets
     if data_dir is None:
-        data_dir = Path.cwd() / "Data" / "optimized_data"
+        data_dir = get_data_dir("subsets")
     else:
         data_dir = Path(data_dir)
 
+    # 默认报告输出目录为当前工作目录下的 Reports
     if report_dir is None:
-        report_dir = Path.cwd() / "Reports"
+        report_dir = get_output_dir("report")
     else:
         report_dir = Path(report_dir)
 
+    # 提前创建输出目录，避免后续保存时因目录不存在而失败
     data_dir.mkdir(parents=True, exist_ok=True)
     report_dir.mkdir(parents=True, exist_ok=True)
 
@@ -186,29 +209,39 @@ def divide_data_by_category(file_path: Path | str | None = None,
 
     print(f"  数据加载成功，形状：{df.shape}")
 
-    # 确认 code_bool 列存在（C12 补丁后产生）
-    for col in _BOOLS:
-        if col not in df.columns:
-            print(f"  ERROR: 列 '{col}' 不存在，请先运行 C12。")
-            return
+    if "category_tag" not in df.columns:
+        print("  ERROR: 列 'category_tag' 不存在，请先运行新的 C12。")
+        return
+
+    category_flags = _extract_category_flags(df)
 
     all_stats: Dict = {"original_rows": len(df), "single": {}, "exclusive": {}}
 
     print("\n" + "=" * 80)
     print("1. 单一分类子集（含该类别，允许重叠）")
     print("-" * 80)
-    all_stats["single"] = create_single_category_subsets(df, data_dir)
+    all_stats["single"] = create_single_category_subsets(df, category_flags, data_dir)
 
     print("\n" + "=" * 80)
     print("2. 纯净分区（互不重叠，完全枚举 2^4=16 个组合）")
     print("-" * 80)
-    all_stats["exclusive"] = create_exclusive_subsets(df, data_dir)
+    all_stats["exclusive"] = create_exclusive_subsets(df, category_flags, data_dir)
 
     generate_division_report(file_path, all_stats, report_dir)
 
 
 def generate_division_report(original_file: Path, stats: Dict, report_dir: Path) -> None:
-    """生成数据集划分的统计报告。"""
+    """
+    生成数据集划分的统计报告。
+
+    参数说明：
+    - original_file：源优化数据文件路径
+    - stats：子集划分统计信息
+    - report_dir：报告输出目录
+
+    返回值：
+    - 无返回值，直接写出 R10_division_report.txt
+    """
 
     from itertools import combinations
 

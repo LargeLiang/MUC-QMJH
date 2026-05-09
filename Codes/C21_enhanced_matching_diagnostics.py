@@ -1,21 +1,16 @@
-# -*- coding: utf-8 -*-
 """
-长度效应匹配诊断分析（PSM + 平衡性检验 + 匹配后 Wilcoxon）。
+C21_enhanced_matching_diagnostics
 
-本脚本不再构造伪“能力代理”变量，而是直接复用 C18 已验证的模型差异变量：
-- ability_diff
-- verbosity_diff
-- format_tendency_diff
+评估长度处理变量的匹配质量，并输出匹配后诊断结果。
 
-同时复用 C19 中的处理定义与倾向得分拟合逻辑，确保：
-1. R17 与 R19 的处理变量完全一致
-2. 匹配诊断与稳健性估计使用同一套混淆变量口径
+功能：
+- 复用 C19 的处理定义和倾向得分估计逻辑
+- 计算匹配前后平衡性指标与匹配后 Wilcoxon 结果
+- 输出诊断表、总览图和文本报告
 
-输出：
-- Reports/R19_enhanced_diagnostics_report.txt
-- Tables/T16_matching_summary.csv
-- Tables/T17_matching_balance.csv
-- Pictures/P18_matching_diagnostics_overview.png
+数据流向：
+    optimized_data.parquet 与 C13 子集 parquet → 倾向得分匹配与平衡性诊断 → Tables/T16_matching_summary.csv 与 Tables/T17_matching_balance.csv
+    + Reports/R19_enhanced_diagnostics_report.txt + Pictures/P18_matching_diagnostics_overview.png
 """
 
 from __future__ import annotations
@@ -29,7 +24,8 @@ import pandas as pd
 from scipy.stats import wilcoxon
 from sklearn.neighbors import NearestNeighbors
 
-from C18_pure_effect import build_model_stats, get_subset_paths, load_data_global, load_subset
+from accessor import build_output_paths, get_analysis_subset_paths, get_output_path
+from C18_pure_effect import build_model_stats, load_data_global, load_subset
 from C19_length_effect_robust import active_confounders, fit_propensity_scores, prepare_subset_for_robustness
 
 
@@ -52,32 +48,6 @@ SUBSET_LABELS_EN = {
     "指令+数学+代码": "IF + Math + Code",
     "四类全含": "All four",
 }
-
-
-def get_report_path(root: Path | str | None = None) -> Path:
-    """返回 R19 报告路径。"""
-    if root is None:
-        root = Path.cwd()
-    return Path(root) / "Reports" / "R19_enhanced_diagnostics_report.txt"
-
-
-def get_table_paths(root: Path | str | None = None) -> dict[str, Path]:
-    """返回 R19 表格输出路径。"""
-    if root is None:
-        root = Path.cwd()
-    table_dir = Path(root) / "Tables"
-    return {
-        "summary": table_dir / "T16_matching_summary.csv",
-        "balance": table_dir / "T17_matching_balance.csv",
-    }
-
-
-def get_picture_path(root: Path | str | None = None) -> Path:
-    """返回 R19 匹配诊断图路径。"""
-    if root is None:
-        root = Path.cwd()
-    return Path(root) / "Pictures" / "P18_matching_diagnostics_overview.png"
-
 
 def standardized_mean_difference(
     treated: pd.Series,
@@ -345,12 +315,19 @@ def run_matching_diagnostics(
     """执行完整的 R19 匹配诊断流程。"""
     root = Path.cwd()
     if report_dir is None:
-        report_path = get_report_path(root)
+        report_path = get_output_path("report", "R19_enhanced_diagnostics_report.txt", root)
     else:
         report_path = Path(report_dir) / "R19_enhanced_diagnostics_report.txt"
 
     if table_dir is None:
-        table_paths = get_table_paths(root)
+        table_paths = build_output_paths(
+            "table",
+            {
+                "summary": "T16_matching_summary.csv",
+                "balance": "T17_matching_balance.csv",
+            },
+            root,
+        )
     else:
         table_root = Path(table_dir)
         table_paths = {
@@ -359,7 +336,7 @@ def run_matching_diagnostics(
         }
 
     if picture_dir is None:
-        picture_path = get_picture_path(root)
+        picture_path = get_output_path("picture", "P18_matching_diagnostics_overview.png", root)
     else:
         picture_path = Path(picture_dir) / "P18_matching_diagnostics_overview.png"
 
@@ -374,7 +351,7 @@ def run_matching_diagnostics(
     global_path = file_path if file_path is not None else None
     df_global = load_data_global(global_path)
     model_stats = build_model_stats(df_global)
-    subset_paths = get_subset_paths(root)
+    subset_paths = get_analysis_subset_paths(root)
 
     report_lines: list[str] = []
     report_lines.append("=" * 80)

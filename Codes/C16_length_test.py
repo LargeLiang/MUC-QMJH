@@ -3,21 +3,14 @@ C16_length_test
 
 对优化数据集及各任务类别子集执行长度偏好 Wilcoxon 符号秩检验。
 
-假设：
-  H₀: median(δᵢ) = 0
-  H₁: median(δᵢ) > 0
-  其中 δᵢ = tokens(获胜模型) − tokens(落败模型)
-
-仅保留 winner ∈ {model_a, model_b} 的行（排除 tie、both_bad）。
-
-输出指标（每个子集）：
-  n_pairs、pct_winner_longer、median_diff、Bootstrap 95% CI、
-  Wilcoxon W、p 值（原始 + Bonferroni 校正）、rank-biserial r、效应分级
+功能：
+- 对全量与 16 个纯净分区子集执行长度差值检验
+- 输出 Wilcoxon 统计量、Bootstrap 区间和效应量摘要
+- 生成汇总表、总览图和文本报告
 
 数据流向：
-    Data/optimized_data/  →  Wilcoxon 检验  →  Reports/R13_wilcoxon_length_test_report.txt
-                                                                                            Tables/T18_length_wilcoxon_summary.csv
-                                                                                            Pictures/P12_length_wilcoxon_overview.png
+    optimized_data.parquet 与 C13 子集 parquet → 长度差值检验 → Tables/T18_length_wilcoxon_summary.csv
+    + Reports/R13_wilcoxon_length_test_report.txt + Pictures/P12_length_wilcoxon_overview.png
 """
 
 import matplotlib.pyplot as plt
@@ -27,63 +20,13 @@ from pathlib import Path
 from scipy.stats import wilcoxon
 from typing import Dict, List, Optional
 
-
-# ---------------------------------------------------------------------------
-# 路径工厂
-# ---------------------------------------------------------------------------
-
-def get_data_dir(root: Path | str | None = None) -> Path:
-    """返回优化数据目录的默认路径。"""
-    if root is None:
-        return Path.cwd() / "Data" / "optimized_data"
-    return Path(root) / "Data" / "optimized_data"
-
-
-def get_report_path(root: Path | str | None = None) -> Path:
-    """返回 R13 报告路径。"""
-    if root is None:
-        root = Path.cwd()
-    return Path(root) / "Reports" / "R13_wilcoxon_length_test_report.txt"
-
-
-def get_table_path(root: Path | str | None = None) -> Path:
-    """返回 C16 汇总表路径。"""
-    if root is None:
-        root = Path.cwd()
-    return Path(root) / "Tables" / "T18_length_wilcoxon_summary.csv"
-
-
-def get_picture_path(root: Path | str | None = None) -> Path:
-    """返回 C16 主图路径。"""
-    if root is None:
-        root = Path.cwd()
-    return Path(root) / "Pictures" / "P12_length_wilcoxon_overview.png"
-
-
-# ---------------------------------------------------------------------------
-# 子集定义：(标签, 文件名)
-# 全量使用 optimized_data.parquet，其余使用 C13 生成的子集文件
-# ---------------------------------------------------------------------------
-SUBSETS: List[tuple[str, str]] = [
-    ("全量",             "optimized_data.parquet"),
-    # 16 个纯净分区（互不重叠，完整覆盖全量）
-    ("无类别",           "no_category_data.parquet"),
-    ("仅创意写作",       "only_cw_data.parquet"),
-    ("仅指令遵循",       "only_if_data.parquet"),
-    ("仅数学",           "only_math_data.parquet"),
-    ("仅代码",           "only_code_data.parquet"),
-    ("创意+指令",        "cw_if_data.parquet"),
-    ("创意+数学",        "cw_math_data.parquet"),
-    ("创意+代码",        "cw_code_data.parquet"),
-    ("指令+数学",        "if_math_data.parquet"),
-    ("指令+代码",        "if_code_data.parquet"),
-    ("数学+代码",        "math_code_data.parquet"),
-    ("创意+指令+数学",   "cw_if_math_data.parquet"),
-    ("创意+指令+代码",   "cw_if_code_data.parquet"),
-    ("创意+数学+代码",   "cw_math_code_data.parquet"),
-    ("指令+数学+代码",   "if_math_code_data.parquet"),
-    ("四类全含",         "all_categories_data.parquet"),
-]
+from accessor import (
+    get_analysis_subset_paths,
+    get_data_path,
+    get_output_path,
+    oriented_winner_difference,
+    with_length_tokens,
+)
 
 SUBSET_LABELS_EN = {
     "全量": "Full",
@@ -114,10 +57,7 @@ N_BOOTSTRAP = 1000
 # 效应量分级阈值（Cohen's 惯例）
 EFFECT_THRESHOLDS = [(0.1, "可忽略"), (0.3, "小"), (0.5, "中"), (float("inf"), "大")]
 
-
-# ---------------------------------------------------------------------------
 # 核心计算
-# ---------------------------------------------------------------------------
 
 def _build_diff(df: pd.DataFrame) -> np.ndarray:
     """
@@ -125,12 +65,15 @@ def _build_diff(df: pd.DataFrame) -> np.ndarray:
 
     排除 winner ∈ {tie, both_bad}，仅保留方向明确的配对。
     """
+    if "a_tokens" not in df.columns or "b_tokens" not in df.columns:
+        df = with_length_tokens(df)
+
     mask = df["winner"].isin(["model_a", "model_b"])
     sub = df[mask].copy()
-    delta = np.where(
-        sub["winner"] == "model_a",
-        sub["a_tokens"].values - sub["b_tokens"].values,
-        sub["b_tokens"].values - sub["a_tokens"].values,
+    delta = oriented_winner_difference(
+        sub["a_tokens"].values,
+        sub["b_tokens"].values,
+        sub["winner"].values,
     )
     return delta.astype(np.float64)
 
@@ -145,7 +88,8 @@ def _bootstrap_ci(arr: np.ndarray, n_boot: int = N_BOOTSTRAP,
     - n_boot：重采样次数
     - rng：随机数生成器（可传入固定 seed，默认新建）
 
-    返回：(ci_low, ci_high)
+    返回值：
+    - (ci_low, ci_high)
     """
     if rng is None:
         rng = np.random.default_rng(42)
@@ -176,7 +120,8 @@ def _cohens_d(arr: np.ndarray) -> tuple[float, float]:
     参数说明：
     - arr：差值数组（含零值）
 
-    返回值：(cohen_d, hedges_g)；非零样本 < 3 时返回 (nan, nan)。
+    返回值：
+    - (cohen_d, hedges_g)；非零样本 < 3 时返回 (nan, nan)
     """
     nonzero = arr[arr != 0]
     n = len(nonzero)
@@ -193,9 +138,10 @@ def run_one_subset(label: str, df: pd.DataFrame) -> Optional[Dict]:
 
     参数说明：
     - label：子集标签（用于报告显示）
-    - df：子集 DataFrame（包含 winner、a_tokens、b_tokens 列）
+    - df：子集 DataFrame（包含 winner 和 nested metadata，或已解包的 a_tokens、b_tokens 列）
 
-    返回：结果字典，若有效对数 < MIN_PAIRS 则返回 None
+    返回值：
+    - 结果字典；若有效对数 < MIN_PAIRS 则返回 None
     """
     delta = _build_diff(df)
     n_pairs = len(delta)
@@ -335,10 +281,7 @@ def plot_length_overview(summary_df: pd.DataFrame, picture_path: Path) -> None:
     fig.savefig(picture_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
-
-# ---------------------------------------------------------------------------
 # 主函数
-# ---------------------------------------------------------------------------
 
 def run_length_test(data_dir: Path | str | None = None,
                     report_dir: Path | str | None = None,
@@ -348,31 +291,40 @@ def run_length_test(data_dir: Path | str | None = None,
     对所有预定义子集执行长度偏好 Wilcoxon 符号秩检验并生成报告。
 
     参数说明：
-    - data_dir：子集 parquet 文件目录（默认为 Data/optimized_data）
+    - data_dir：子集 parquet 文件目录（默认为 Data/subsets）
     - report_dir：报告保存目录（默认为 Reports）
     - table_dir：汇总表保存目录（默认为 Tables）
     - picture_dir：图片保存目录（默认为 Pictures）
+
+    返回值：
+    - 输出文件路径字典；若无有效结果则返回 None
     """
 
     root = Path.cwd()
+    default_subset_paths = get_analysis_subset_paths(root)
+    optimized_file_path = get_data_path("optimized", root=root)
 
     if data_dir is None:
-        data_dir = get_data_dir()
+        subset_paths = default_subset_paths
     else:
-        data_dir = Path(data_dir)
+        subset_root = Path(data_dir)
+        subset_paths = {
+            label: optimized_file_path if label == "全量" else subset_root / path.name
+            for label, path in default_subset_paths.items()
+        }
 
     if report_dir is None:
-        report_dir = get_report_path(root).parent
+        report_dir = get_output_path("report", "R13_wilcoxon_length_test_report.txt", root).parent
     else:
         report_dir = Path(report_dir)
 
     if table_dir is None:
-        table_path = get_table_path(root)
+        table_path = get_output_path("table", "T18_length_wilcoxon_summary.csv", root)
     else:
         table_path = Path(table_dir) / "T18_length_wilcoxon_summary.csv"
 
     if picture_dir is None:
-        picture_path = get_picture_path(root)
+        picture_path = get_output_path("picture", "P12_length_wilcoxon_overview.png", root)
     else:
         picture_path = Path(picture_dir) / "P12_length_wilcoxon_overview.png"
 
@@ -386,13 +338,12 @@ def run_length_test(data_dir: Path | str | None = None,
     print("C16 长度偏好 Wilcoxon 符号秩检验")
     print("=" * 80)
 
-    for label, filename in SUBSETS:
-        fpath = data_dir / filename
+    for label, fpath in subset_paths.items():
         if not fpath.exists():
             print(f"  [{label}] 文件不存在，跳过：{fpath}")
             continue
 
-        df = pd.read_parquet(fpath, columns=["winner", "a_tokens", "b_tokens"])
+        df = pd.read_parquet(fpath, columns=["winner", "metadata_a", "metadata_b"])
         print(f"\n[{label}]  总行数={len(df):,}  读取完成")
 
         res = run_one_subset(label, df)
@@ -420,10 +371,7 @@ def run_length_test(data_dir: Path | str | None = None,
         "picture": picture_path,
     }
 
-
-# ---------------------------------------------------------------------------
 # 报告生成
-# ---------------------------------------------------------------------------
 
 def generate_report(results: List[Dict], k: int, report_dir: Path) -> None:
     """生成 R13 Wilcoxon 长度检验报告。"""
@@ -500,10 +448,7 @@ def generate_report(results: List[Dict], k: int, report_dir: Path) -> None:
 
     print(f"\n报告已保存至: {report_path}")
 
-
-# ---------------------------------------------------------------------------
 # 入口
-# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     print("=" * 80)

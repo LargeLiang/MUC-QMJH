@@ -1,19 +1,18 @@
 """
 C12_optimize_data
 
-对整合数据执行清洗、扁平化和字段工程，生成分析就绪的优化数据集。
+对整合数据执行清洗、重组，生成新的优化数据集。
 
 功能：
 - 过滤 evaluation_order > 1 的记录（会话历史污染）
 - 过滤 content 为空的记录（content 字段为空 ndarray / 空列表，共 ~175 行）
-- 从 conversation 列表中提取各轮对话文本和 token 数
-- 计算长度特征（sum_user_tokens、a/b 模型响应 token 数）
-- 扁平化 category_tag 字典为独立布尔列（CW / IF / MATH / CODE 四类）
-- 输出包含 32 列的结构化 parquet 文件
+- 将 conversation_a / conversation_b 重组为 conv_a / conv_b / conv_user 三个嵌套结构
+- 将 token 与格式统计重组为 metadata_a / metadata_b / metadata_user
+- 将 category_tag 与 criteria 收敛为固定字段名的嵌套结构
 
 数据流向：
-  integrated_data.parquet（135,634 行）→ 清洗+扁平化 → optimized_data.parquet（~108,105 行 × 32 列）
-  + Reports/R09_optimization_report.txt
+    integrated_data.parquet（135,634 行）→ 清洗+嵌套重组 → optimized_data.parquet
+    + Reports/R09_optimization_report.txt
 """
 
 import pandas as pd
@@ -23,18 +22,7 @@ from tqdm import tqdm
 from typing import Dict, Tuple
 from collections import Counter
 
-
-def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
-    """返回整合数据 parquet 文件的默认路径。"""
-
-    # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
-    if root is None:
-        root_path = Path.cwd()
-    else:
-        root_path = Path(root)
-
-    # 整合数据文件位于项目根目录下的 Data/integrated_data/integrated_data.parquet
-    return root_path / "Data" / "integrated_data" / "integrated_data.parquet"
+from accessor import get_data_dir, get_data_path, get_output_dir
 
 
 def check_qualification(row) -> Tuple[bool, str]:
@@ -47,7 +35,11 @@ def check_qualification(row) -> Tuple[bool, str]:
     3. category_tag中creative_writing和if的评分都不为None（需要有效标签）
     4. language不是错误标记'<err>'（排除语言识别失败的行）
 
-    返回值：(是否合格, 不合格原因描述)
+    参数说明：
+    - row：单行数据字典，用于逐项校验过滤条件
+
+    返回值：
+    - (是否合格, 不合格原因描述)
     """
     
     # 1. 检查 evaluation_order：只保留第一轮评价
@@ -91,24 +83,47 @@ def check_qualification(row) -> Tuple[bool, str]:
     return True, ""
 
 
+def _extract_first_text(content: np.ndarray | list | tuple | object) -> str:
+    """从 content 列表的首个元素中提取 text。"""
+
+    if isinstance(content, (list, tuple, np.ndarray)) and len(content) > 0:
+        first_item = content[0]
+        if isinstance(first_item, dict):
+            return first_item.get("text", "")
+    return ""
+
+
+def _normalize_format_counts(value: object) -> Dict:
+    """规范化格式计数字段，确保写入 parquet 时保持 dict 结构。"""
+
+    if isinstance(value, dict):
+        return value
+    return {}
+
+
 def optimize_conversation(conv_a: np.ndarray | list | tuple, 
                           conv_b: np.ndarray | list | tuple) -> Dict:
     """
     优化和扁平化对话结构。
 
-    将嵌套的对话结构（按turn分组的user/assistant消息）转换为扁平结构，
-    按turn分别提取用户提问、模型A回复、模型B回复的文本内容。
+    将原始双侧对话结构重组为三个嵌套字典。
+
+    新结构保留 turn 粒度文本，但不再把 turn 文本展开为顶层列：
+    - conv_a：模型 A 的回答文本
+    - conv_b：模型 B 的回答文本
+    - conv_user：用户输入文本
 
     参数说明：
     - conv_a：模型A侧对话，结构为[{role, content: [{text, ...}]}, ...]
     - conv_b：模型B侧对话，结构相同
 
-    返回：
+    返回值：
+    -
     {
         'turns': 总轮数,
-        'a_conv': {f'turn_{i}_a_text': 文本, ...},
-        'b_conv': {f'turn_{i}_b_text': 文本, ...},
-        'user_conv': {f'turn_{i}_user_text': 文本, ...}
+        'conv_a': {f'turn_{i}_text_a': 文本, ...},
+        'conv_b': {f'turn_{i}_text_b': 文本, ...},
+        'conv_user': {f'turn_{i}_text_user': 文本, ...}
     }
     """
     
@@ -120,9 +135,9 @@ def optimize_conversation(conv_a: np.ndarray | list | tuple,
     
     optimized_conv = {
         "turns": turns_count,
-        "a_conv": {},
-        "b_conv": {},
-        "user_conv": {}
+        "conv_a": {},
+        "conv_b": {},
+        "conv_user": {}
     }
 
     # 处理 conversation_a：提取user和assistant A的文本
@@ -134,19 +149,14 @@ def optimize_conversation(conv_a: np.ndarray | list | tuple,
             role = segment.get("role")
             content = segment.get("content")
             
-            # 从第一个content item提取文本（通常只有一个item）
-            text = ""
-            if isinstance(content, (list, tuple)) and len(content) > 0:
-                first_item = content[0]
-                if isinstance(first_item, dict):
-                    text = first_item.get("text", "")
+            text = _extract_first_text(content)
             
             # 根据角色分配到对应的turn
             turn_num = i // 2 + 1
             if role == "user":
-                optimized_conv["user_conv"][f"turn_{turn_num}_user_text"] = text
+                optimized_conv["conv_user"][f"turn_{turn_num}_text_user"] = text
             elif role == "assistant":
-                optimized_conv["a_conv"][f"turn_{turn_num}_a_text"] = text
+                optimized_conv["conv_a"][f"turn_{turn_num}_text_a"] = text
 
     # 处理 conversation_b：提取assistant B的文本
     if isinstance(conv_b, (list, tuple, np.ndarray)):
@@ -159,14 +169,10 @@ def optimize_conversation(conv_a: np.ndarray | list | tuple,
                 continue
             
             content = segment.get("content")
-            text = ""
-            if isinstance(content, (list, tuple)) and len(content) > 0:
-                first_item = content[0]
-                if isinstance(first_item, dict):
-                    text = first_item.get("text", "")
+            text = _extract_first_text(content)
             
             turn_num = i // 2 + 1
-            optimized_conv["b_conv"][f"turn_{turn_num}_b_text"] = text
+            optimized_conv["conv_b"][f"turn_{turn_num}_text_b"] = text
 
     return optimized_conv
 
@@ -175,27 +181,28 @@ def optimize_conv_metadata(metadata: Dict) -> Dict:
     """
     优化 conv_metadata 字段。
 
-    从原始的冗余元数据（包含多种token计数和格式计数）中提取关键字段，
-    避免数据膨胀，同时保留对分析必需的信息：
-    - 模型A/B的token数和格式特征（标题、列表、粗体数量）
-    - 用户端的token数
+    将 token 和格式统计重组为 metadata_a / metadata_b / metadata_user。
+
+    token 字段按更新后的 P03 只保留 Order 级总量；
+    header / list / bold 保留原始 dict 结构，避免格式链路丢失层级信息。
     """
     
     optimized_metadata = {
-        # 模型A相关字段
-        "a_tokens": metadata.get("sum_assistant_a_tokens", 0),
-        "a_header_count": metadata.get("header_count_a", 0),
-        "a_list_count": metadata.get("list_count_a", 0),
-        "a_bold_count": metadata.get("bold_count_a", 0),
-        
-        # 模型B相关字段
-        "b_tokens": metadata.get("sum_assistant_b_tokens", 0),
-        "b_header_count": metadata.get("header_count_b", 0),
-        "b_list_count": metadata.get("list_count_b", 0),
-        "b_bold_count": metadata.get("bold_count_b", 0),
-        
-        # 用户信息
-        "user_tokens": metadata.get("sum_user_tokens", 0)
+        "metadata_a": {
+            "token_a": metadata.get("sum_assistant_a_tokens", 0) or 0,
+            "header_a": _normalize_format_counts(metadata.get("header_count_a", {})),
+            "list_a": _normalize_format_counts(metadata.get("list_count_a", {})),
+            "bold_a": _normalize_format_counts(metadata.get("bold_count_a", {})),
+        },
+        "metadata_b": {
+            "token_b": metadata.get("sum_assistant_b_tokens", 0) or 0,
+            "header_b": _normalize_format_counts(metadata.get("header_count_b", {})),
+            "list_b": _normalize_format_counts(metadata.get("list_count_b", {})),
+            "bold_b": _normalize_format_counts(metadata.get("bold_count_b", {})),
+        },
+        "metadata_user": {
+            "token_user": metadata.get("sum_user_tokens", 0) or 0,
+        },
     }
 
     return optimized_metadata
@@ -205,38 +212,44 @@ def optimize_category_tag(category_tag: Dict, is_code: bool = False) -> Dict:
     """
     优化 category_tag 字段。
 
-    从category_tag的多层次嵌套结构中提取四个关键维度模块的核心信息：
-    - creative_writing：创意写作分类和评分
-    - if（instruction following）：指令遵循能力的分类和评分
-    - math：数学相关任务分类（仅分类，无评分）
-    - code：代码任务分类（来自 conv_metadata 的 is_code 字段）
+    从 category_tag 的多层结构中提取四个任务类别布尔值。
+
+    新 schema 中 category_tag 只保留任务类型本身：
+    - cw：creative writing
+    - if：instruction following
+    - math：数学
+    - code：代码
 
     参数说明：
     - category_tag：原始 category_tag 字典
     - is_code：是否为代码任务（默认 False，由 is_code 字段传入）
     """
     
-    optimized_category_tag = {}
+    optimized_category_tag = {"category_tag": {}}
 
     # 1. 提取 creative_writing（创意写作）的分类和评分
     cw = category_tag.get("creative_writing_v0.1", {})
     if isinstance(cw, dict):
-        optimized_category_tag["creative_writing_bool"] = cw.get("creative_writing", False)
-        optimized_category_tag["creative_writing_score"] = cw.get("score")
+        optimized_category_tag["category_tag"]["cw"] = bool(cw.get("creative_writing", False))
+    else:
+        optimized_category_tag["category_tag"]["cw"] = False
 
     # 2. 提取 if（指令遵循）的分类和评分
     if_mod = category_tag.get("if_v0.1", {})
     if isinstance(if_mod, dict):
-        optimized_category_tag["if_bool"] = if_mod.get("if", False)
-        optimized_category_tag["if_score"] = if_mod.get("score")
+        optimized_category_tag["category_tag"]["if"] = bool(if_mod.get("if", False))
+    else:
+        optimized_category_tag["category_tag"]["if"] = False
 
     # 3. 提取 math（数学）的分类
     math_mod = category_tag.get("math_v0.1", {})
     if isinstance(math_mod, dict):
-        optimized_category_tag["math_bool"] = math_mod.get("math", False)
+        optimized_category_tag["category_tag"]["math"] = bool(math_mod.get("math", False))
+    else:
+        optimized_category_tag["category_tag"]["math"] = False
 
     # 4. 代码任务标记（直接来自顶级 is_code 字段，无需解析 category_tag）
-    optimized_category_tag["code_bool"] = bool(is_code)
+    optimized_category_tag["category_tag"]["code"] = bool(is_code)
 
     return optimized_category_tag
 
@@ -257,12 +270,12 @@ def optimize_criteria(category_tag: Dict) -> Dict:
     这些维度通常为二值（True/False）或多值分类。
     """
     
-    optimized_criteria = {}
+    optimized_criteria = {"criteria": {}}
     
     criteria = category_tag.get("criteria_v0.1", {})
     if isinstance(criteria, dict):
         # 提取七个评估维度
-        optimized_criteria = {
+        optimized_criteria["criteria"] = {
             "complexity": criteria.get("complexity"),
             "creativity": criteria.get("creativity"),
             "domain_knowledge": criteria.get("domain_knowledge"),
@@ -292,26 +305,25 @@ def optimize_data(file_path: Path | str | None = None,
     - data_dir：优化后数据文件的保存目录（默认为 Data/optimized_data）
     - report_dir：清洗报告的保存目录（默认为 Reports）
 
-    最终输出包括：
-    - 优化后的完整数据集（parquet格式）
-    - 清洗统计报告（txt格式）
+    返回值：
+    - 无返回值，直接输出 optimized_data.parquet 和清洗统计报告
     """
 
     # 支持传入自定义文件路径和输出目录，便于测试或在不同目录下运行脚本
     if file_path is None:
-        file_path = get_integrated_parquet_path()
+        file_path = get_data_path("integrated")
     else:
         file_path = Path(file_path)
 
     # 默认数据输出目录为当前工作目录下的 Data/optimized_data
     if data_dir is None:
-        data_dir = Path.cwd() / "Data" / "optimized_data"
+        data_dir = get_data_dir("optimized")
     else:
         data_dir = Path(data_dir)
 
     # 默认报告输出目录为当前工作目录下的 Reports
     if report_dir is None:
-        report_dir = Path.cwd() / "Reports"
+        report_dir = get_output_dir("report")
     else:
         report_dir = Path(report_dir)
 
@@ -365,7 +377,7 @@ def optimize_data(file_path: Path | str | None = None,
             optimized_row : Dict[str, any] = {}
 
             # 1. 直接迁移的字段（无需优化）
-            direct_cols : list[str] = ["id", "model_a", "model_b", "winner", "language", "is_code"]
+            direct_cols : list[str] = ["id", "model_a", "model_b", "winner", "language"]
             for col in direct_cols:
                 optimized_row[col] = row_dict.get(col)
 
@@ -376,11 +388,11 @@ def optimize_data(file_path: Path | str | None = None,
             )
             optimized_row.update(optimized_conv)
 
-            # 3. 优化顺序数据：简化格式特征统计
+            # 3. 优化顺序数据：按 metadata_a / metadata_b / metadata_user 重组
             optimized_meta : Dict[str, any] = optimize_conv_metadata(row_dict.get("conv_metadata", {}))
             optimized_row.update(optimized_meta)
 
-            # 4. 优化分类标签：提取关键标签和评分（含 code_bool）
+            # 4. 优化分类标签：固定为 cw / if / math / code 四个布尔字段
             optimized_tags : Dict[str, any] = optimize_category_tag(
                 row_dict.get("category_tag", {}),
                 is_code=bool(row_dict.get("is_code", False))
@@ -433,6 +445,9 @@ def generate_optimization_report(file_path: Path, stats: Dict,
     - stats：优化过程的统计信息
     - optimized_df_shape：优化后数据的形状
     - report_dir：报告的保存目录
+
+    返回值：
+    - 无返回值，直接写出 R09_optimization_report.txt
     """
 
     report_path = report_dir / "R09_optimization_report.txt"
@@ -464,10 +479,11 @@ def generate_optimization_report(file_path: Path, stats: Dict,
         f.write("3. 数据优化说明\n")
         f.write("-" * 80 + "\n")
         f.write("已执行的优化操作：\n")
-        f.write("  - 对话扁平化：按turn提取user/assistant文本\n")
-        f.write("  - 元数据简化：保留token数和格式特征，去除冗余字段\n")
-        f.write("  - 标签降维：提取creative_writing、if、math三个维度\n")
-        f.write("  - 维度保留：保留criterion_v0.1的七个评估维度\n\n")
+        f.write("  - 对话重组：生成 conv_a / conv_b / conv_user 三个嵌套结构\n")
+        f.write("  - 元数据重组：生成 metadata_a / metadata_b / metadata_user\n")
+        f.write("  - 标签收敛：category_tag 固定为 cw / if / math / code 四个布尔字段\n")
+        f.write("  - 维度保留：criteria 保留七个评估维度\n")
+        f.write("  - 兼容策略：不再持久化 a_tokens、b_tokens、user_tokens、四个顶层 bool 等旧平铺列\n\n")
 
         f.write("=" * 80 + "\n")
         f.write("报告生成时间: " + pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S") + "\n")

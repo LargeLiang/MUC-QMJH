@@ -20,18 +20,7 @@ from time import perf_counter
 from typing import Iterable
 from tqdm import tqdm
 
-def get_parquet_file_paths(root: Path | str | None = None) -> list[Path]:
-    """构造原始 parquet 分片文件的规范路径列表。"""
-
-    # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
-    if root is None:
-        root_path : Path = Path.cwd()
-    else:
-        root_path : Path = Path(root)
-
-    # 原始数据文件位于项目根目录下的 Data/lmarena-aiarena-human-preference-140k/Data
-    data_dir : Path = root_path / "Data" / "lmarena-aiarena-human-preference-140k" / "Data"
-    return [data_dir / f"train-{i:05d}-of-00007.parquet" for i in range(7)]
+from accessor import get_data_dir, get_raw_parquet_file_paths
 
 
 def save_parquet_with_progress(
@@ -47,7 +36,8 @@ def save_parquet_with_progress(
     - output_file：输出 parquet 文件路径
     - chunk_size：每次写入的行数（默认值：10000）
 
-    返回值：保存耗时（秒）
+    返回值：
+    - 保存耗时（秒）
     """
 
     output_path: Path = Path(output_file)
@@ -93,13 +83,13 @@ def integrate_original_data(file_paths: Iterable[Path] | None = None, output_dir
     # 支持传入自定义文件路径列表，便于测试或在不同目录下运行脚本
     # 将路径集合转为列表，便于多次计算长度和循环访问
     if file_paths is None:
-        file_paths : list[Path] = get_parquet_file_paths()
+        file_paths : list[Path] = get_raw_parquet_file_paths()
     else:
         file_paths : list[Path] = list(file_paths)
 
     # 默认输出目录为当前工作目录下的 Data/integrated_data
     if output_dir is None:
-        output_dir : Path = Path.cwd() / "Data" / "integrated_data"
+        output_dir : Path = get_data_dir("integrated")
     else:
         output_dir : Path = Path(output_dir)
 

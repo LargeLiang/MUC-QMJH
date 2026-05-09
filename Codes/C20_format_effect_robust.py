@@ -1,30 +1,16 @@
-# -*- coding: utf-8 -*-
 """
-格式效应稳健性分析（调整逻辑回归 + 稳定化 IPW）。
+C20_format_effect_robust
 
-研究问题：
-  在控制长度差、任务类型、问题属性与模型能力后，
-  “A 是否具有更高的格式密度”是否仍然显著提高 A 获胜的概率？
+评估格式密度处理变量在控制混淆因素后的稳健效应。
 
-分析设计：
-  1. 以三类格式密度差作为处理方向：
-     - header_density_diff > 0  -> A 标题密度更高
-     - bold_density_diff > 0    -> A 粗体密度更高
-     - list_density_diff > 0    -> A 列表密度更高（敏感性）
-  2. 对每个特征分别剔除差值为 0 的配对，避免将“无处理差异”混入对照组
-  3. 结果变量：winner_a = 1（model_a 获胜）
-  4. 混淆变量：
-     - prompt 负荷：user_tokens, turns
-     - 任务类型：creative_writing_bool, if_bool, math_bool, code_bool
-     - 问题级控制：7 个 criteria
-     - 模型级代理：ability_diff, verbosity_diff, format_tendency_diff
-     - 长度控制：token_diff_ab
-     - 其他格式控制：非当前处理特征的其余两个格式密度差
+功能：
+- 构造标题、粗体和列表三类格式处理变量
+- 结合调整逻辑回归与稳定化 IPW 估计格式效应
+- 输出稳健性汇总表、森林图和文本报告
 
-输出：
-  - Reports/R18_format_effect_robust_report.txt
-  - Tables/T15_format_robust_summary.csv
-    - Pictures/P17_format_robust_forest.png
+数据流向：
+    optimized_data.parquet 与 C13 子集 parquet → 格式稳健性估计 → Tables/T15_format_robust_summary.csv
+    + Reports/R18_format_effect_robust_report.txt + Pictures/P17_format_robust_forest.png
 """
 
 from __future__ import annotations
@@ -41,15 +27,16 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
+from accessor import get_analysis_subset_paths, get_output_path
 from C18_pure_effect import (
     CRITERIA_COLS,
     FORMAT_DENSITY_VARS,
     TASK_TYPE_COLS,
     build_model_stats,
-    get_subset_paths,
     load_data_global,
     load_subset,
 )
+from stats_utils import active_nonconstant_columns, zscore_series
 
 
 FORMAT_FEATURES: list[dict[str, str | bool]] = [
@@ -105,40 +92,13 @@ BASE_CONTINUOUS_CONFOUNDERS: list[str] = [
     "bold_density_diff",
 ]
 
-
-def get_report_path(root: Path | str | None = None) -> Path:
-    """返回 R18 报告路径。"""
-    if root is None:
-        root = Path.cwd()
-    return Path(root) / "Reports" / "R18_format_effect_robust_report.txt"
-
-
-def get_table_path(root: Path | str | None = None) -> Path:
-    """返回 R18 汇总表路径。"""
-    if root is None:
-        root = Path.cwd()
-    return Path(root) / "Tables" / "T15_format_robust_summary.csv"
-
-
-def get_picture_path(root: Path | str | None = None) -> Path:
-    """返回 R18 森林图路径。"""
-    if root is None:
-        root = Path.cwd()
-    return Path(root) / "Pictures" / "P17_format_robust_forest.png"
-
-
-def _zscore(series: pd.Series) -> pd.Series:
-    """对连续变量做 z 标准化，常数列返回 0。"""
-    mu = float(series.mean())
-    sigma = float(series.std(ddof=1))
-    if sigma <= 0 or np.isnan(sigma):
-        return pd.Series(np.zeros(len(series)), index=series.index, dtype=float)
-    return ((series - mu) / sigma).astype(float)
-
-
 def prepare_subset_for_feature(df: pd.DataFrame, feature_col: str) -> pd.DataFrame:
     """
     构造单个格式特征的稳健性分析数据表。
+
+    参数说明：
+    - df：包含配对差值特征的子集数据框
+    - feature_col：当前分析的格式密度差列名
 
     返回值：
     - 剔除该格式差值为 0 的配对
@@ -152,7 +112,7 @@ def prepare_subset_for_feature(df: pd.DataFrame, feature_col: str) -> pd.DataFra
 
     continuous_cols = [col for col in BASE_CONTINUOUS_CONFOUNDERS if col in s.columns]
     for col in continuous_cols:
-        s[col] = _zscore(s[col])
+        s[col] = zscore_series(s[col])
 
     for col in TASK_TYPE_COLS + CRITERIA_COLS + ["winner_a", "treatment_a", "treatment_wins"]:
         if col in s.columns:
@@ -165,14 +125,20 @@ def active_confounders(df: pd.DataFrame, feature_col: str) -> list[str]:
     """返回当前格式特征可用且非常数的混淆变量。"""
     continuous = [col for col in BASE_CONTINUOUS_CONFOUNDERS if col != feature_col]
     candidates = continuous + TASK_TYPE_COLS + CRITERIA_COLS
-    return [col for col in candidates if col in df.columns and df[col].nunique(dropna=True) > 1]
+    return active_nonconstant_columns(df, candidates)
 
 
 def fit_logit_effect(df: pd.DataFrame, treatment_col: str, predictors: list[str]) -> dict[str, float] | None:
     """
     拟合 winner_a 的逻辑回归并提取处理变量效应量。
 
-    返回值：coef, se, p, OR, OR 95% CI, pseudo_r2。
+    参数说明：
+    - df：稳健性分析数据表
+    - treatment_col：处理变量列名
+    - predictors：回归自变量列表
+
+    返回值：
+    - 包含 coef、se、p、OR、OR 95% CI 和 pseudo_r2 的字典；失败时返回 None
     """
     if not predictors:
         return None
@@ -457,17 +423,17 @@ def run_format_effect_robust(
     """执行完整的 R18 格式稳健性分析。"""
     root = Path.cwd()
     if report_dir is None:
-        report_path = get_report_path(root)
+        report_path = get_output_path("report", "R18_format_effect_robust_report.txt", root)
     else:
         report_path = Path(report_dir) / "R18_format_effect_robust_report.txt"
 
     if table_dir is None:
-        table_path = get_table_path(root)
+        table_path = get_output_path("table", "T15_format_robust_summary.csv", root)
     else:
         table_path = Path(table_dir) / "T15_format_robust_summary.csv"
 
     if picture_dir is None:
-        picture_path = get_picture_path(root)
+        picture_path = get_output_path("picture", "P17_format_robust_forest.png", root)
     else:
         picture_path = Path(picture_dir) / "P17_format_robust_forest.png"
 
@@ -481,7 +447,7 @@ def run_format_effect_robust(
     global_path = file_path if file_path is not None else None
     df_global = load_data_global(global_path)
     model_stats = build_model_stats(df_global)
-    subset_paths = get_subset_paths(root)
+    subset_paths = get_analysis_subset_paths(root)
 
     report_lines: list[str] = []
     report_lines.append("=" * 80)

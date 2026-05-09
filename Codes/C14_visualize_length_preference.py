@@ -23,73 +23,28 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import warnings
 
+from accessor import (
+    get_data_dir,
+    get_data_path,
+    get_output_dir,
+    get_output_path,
+    load_parquet_or_none,
+    with_length_tokens,
+)
+
 # 全局配置：忽略所有警告（可选）
 warnings.filterwarnings('ignore')
 
-# matplotlib和seaborn配置：用于支持中文显示和美观的图表样式
+# matplotlib 和 seaborn 配置：用于支持中文显示和美观的图表样式
 plt.rcParams['font.sans-serif'] = ['SimHei', 'Arial Unicode MS', 'DejaVu Sans']
 plt.rcParams['axes.unicode_minus'] = False  # 用于正确显示负号
 plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
 
-# 路径管理函数：集中管理项目中的文件和目录路径
-
-def get_optimized_parquet_path(root: Path | str | None = None) -> Path:
-    """返回优化数据 parquet 文件的默认路径。"""
-    
-    # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
-    if root is None:
-        root_path = Path.cwd()
-    else:
-        root_path = Path(root)
-    
-    # 优化数据文件位于项目根目录下的 Data/optimized_data/optimized_data.parquet
-    return root_path / "Data" / "optimized_data" / "optimized_data.parquet"
-
-
-def get_length_data_path(root: Path | str | None = None,
-                         subset_slug: str | None = None) -> Path:
-    """
-    返回长度数据 parquet 文件的默认路径。
-    
-    此路径用于存储预处理后的长度特征数据，可用于后续快速分析。
-    当 subset_slug 为 None 时，返回全量缓存路径；否则返回对应子集缓存路径。
-    """
-    if root is None:
-        root_path = Path.cwd()
-    else:
-        root_path = Path(root)
-
-    length_data_dir = root_path / "Data" / "length_data"
-    if subset_slug is None:
-        return length_data_dir / "length_data.parquet"
-    return length_data_dir / f"{subset_slug}_length_data.parquet"
-
-
-def get_chart_output_path(order_index: int,
-                          slug: str,
-                          root: Path | str | None = None) -> Path:
-    """返回长度偏好图表输出路径，统一使用 P04_XX 编号。"""
-
-    if root is None:
-        root_path = Path.cwd()
-    else:
-        root_path = Path(root)
-
-    return root_path / "Pictures" / f"P04_{order_index:02d}_{slug}_length_diff_line_chart.png"
-
-
-def get_table_output_path(order_index: int,
-                          slug: str,
-                          root: Path | str | None = None) -> Path:
-    """返回长度偏好统计表输出路径，统一使用 T01_XX 编号。"""
-
-    if root is None:
-        root_path = Path.cwd()
-    else:
-        root_path = Path(root)
-
-    return root_path / "Tables" / f"T01_{order_index:02d}_{slug}_length_diff_analysis_stats.csv"
+LENGTH_CACHE_FILE = "length_data.parquet"
+LENGTH_REPORT_FILE = "R11_length_preference_report.txt"
+LENGTH_CHART_FILE_TEMPLATE = "P04_{order_index:02d}_{slug}_length_diff_line_chart.png"
+LENGTH_TABLE_FILE_TEMPLATE = "T01_{order_index:02d}_{slug}_length_diff_analysis_stats.csv"
 
 
 def save_length_data_cache(length_data: pd.DataFrame,
@@ -97,7 +52,7 @@ def save_length_data_cache(length_data: pd.DataFrame,
     """
     保存解缠化后的长度数据缓存。
 
-    方法说明：全量与子集都走同一缓存写出逻辑，避免只有全量保存中间结果而子集缺失。
+    全量与子集都走同一缓存写出逻辑，避免只有全量保存中间结果而子集缺失。
     """
 
     cache_path = Path(cache_path)
@@ -122,7 +77,7 @@ def prepare_length_data(df: pd.DataFrame) -> pd.DataFrame:
     参数说明：
     - df：优化后的数据框，需包含以下列：
         - winner: 评价结果
-        - a_tokens, b_tokens: 两个模型的输出 token 数
+        - metadata_a, metadata_b: 新 schema 下的 token 元数据
         - model_a, model_b: 两个模型的名称
 
     返回值：包含 length_diff、is_winner、model 列的解缠化数据框
@@ -133,6 +88,10 @@ def prepare_length_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     print("准备长度特征数据...")
 
+    # 新 schema 将 token 收纳到 metadata_a / metadata_b 中；
+    # 此处只在分析期解包为临时列，不改变持久化 parquet 结构。
+    df = with_length_tokens(df)
+
     # 1. 过滤掉"平局"评价，保留有明确胜负的评价
     win_df = df[~df['winner'].isin(['tie', 'both_bad'])].copy()
     original_rows = len(df)
@@ -142,6 +101,7 @@ def prepare_length_data(df: pd.DataFrame) -> pd.DataFrame:
 
     # 2. 计算长度差值（绝对长度）
     # 正值表示模型 A 更冗长，负值表示模型 B 更冗长
+    print("  从 metadata_a / metadata_b 提取 token 总量")
     print("  计算长度差值 = a_tokens - b_tokens（正值表示 A 更长）")
     win_df['length_diff'] = win_df['a_tokens'] - win_df['b_tokens']
 
@@ -347,7 +307,10 @@ def create_statistical_table(diff_bin_stats: pd.DataFrame,
     print("创建统计表格...")
 
     if output_path is None:
-        output_path = get_table_output_path(1, "full")
+        output_path = get_output_path(
+            "table",
+            LENGTH_TABLE_FILE_TEMPLATE.format(order_index=1, slug="full"),
+        )
     else:
         output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -401,7 +364,7 @@ def generate_analysis_report(diff_bin_stats: pd.DataFrame,
     print(f"生成分析报告（{section_tag}）...")
 
     if output_path is None:
-        output_path = Path.cwd() / "Reports" / "R11_length_preference_report.txt"
+        output_path = get_output_path("report", LENGTH_REPORT_FILE)
     else:
         output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -461,10 +424,10 @@ if __name__ == "__main__":
     print("=" * 80)
 
     # 路径初始化
-    input_file_path = get_optimized_parquet_path()
-    chart_dir = Path.cwd() / "Pictures"
-    report_dir = Path.cwd() / "Reports"
-    table_dir = Path.cwd() / "Tables"
+    input_file_path = get_data_path("optimized")
+    chart_dir = get_output_dir("picture")
+    report_dir = get_output_dir("report")
+    table_dir = get_output_dir("table")
 
     # 创建必要的目录
     for d in [chart_dir, report_dir, table_dir]:
@@ -474,10 +437,10 @@ if __name__ == "__main__":
     n_bins = 20
 
     print(f"\n加载数据: {input_file_path}")
-    if not input_file_path.exists():
+    df = load_parquet_or_none(input_file_path)
+    if df is None:
         print(f"  ERROR: 输入文件不存在，请先运行 C12_optimize_data.py")
         exit(1)
-    df = pd.read_parquet(input_file_path)
     print(f"  数据已加载，形状: {df.shape}")
 
     # 1. 全量分析
@@ -487,20 +450,29 @@ if __name__ == "__main__":
     length_data = prepare_length_data(df)
 
     # 1.1 保存解缠化缓存
-    save_length_data_cache(length_data, get_length_data_path())
+    save_length_data_cache(length_data, get_data_path("length", LENGTH_CACHE_FILE))
 
     # 1.2 分箱 + 可视化
-    full_chart_path = get_chart_output_path(1, "full")
+    full_chart_path = get_output_path(
+        "picture",
+        LENGTH_CHART_FILE_TEMPLATE.format(order_index=1, slug="full"),
+    )
     diff_bin_stats = create_length_diff_bins(length_data, n_bins)
     diff_best_bin, diff_best_win_rate, best_avg_diff = plot_length_diff_preference_chart(
         diff_bin_stats, full_chart_path
     )
 
     # 1.3 统计表格
-    create_statistical_table(diff_bin_stats, get_table_output_path(1, "full"))
+    create_statistical_table(
+        diff_bin_stats,
+        get_output_path(
+            "table",
+            LENGTH_TABLE_FILE_TEMPLATE.format(order_index=1, slug="full"),
+        ),
+    )
 
     # 1.4 报告（首次写入，覆写模式）
-    report_path = report_dir / "R11_length_preference_report.txt"
+    report_path = get_output_path("report", LENGTH_REPORT_FILE)
     generate_analysis_report(
         diff_bin_stats, diff_best_bin, diff_best_win_rate, best_avg_diff,
         report_path, mode="w", section_tag="全量数据"
@@ -513,7 +485,7 @@ if __name__ == "__main__":
         (4, "math_true_data.parquet", "math_true", "MATH"),
         (5, "code_true_data.parquet", "code_true", "CODE"),
     ]
-    subset_dir = Path.cwd() / "Data" / "optimized_data"
+    subset_dir = get_data_dir("subsets")
 
     for order_index, filename, slug, tag in subset_configs:
         subset_path = subset_dir / filename
@@ -529,7 +501,7 @@ if __name__ == "__main__":
         print(f"  子集形状: {df_sub.shape}")
 
         length_data_sub = prepare_length_data(df_sub)
-        save_length_data_cache(length_data_sub, get_length_data_path(subset_slug=slug))
+        save_length_data_cache(length_data_sub, get_data_path("length", f"{slug}_length_data.parquet"))
 
         # 子集若样本量不足以 n_bins 分箱则降为 10 箱
         bins_sub = n_bins if len(length_data_sub) >= n_bins * 30 else 10
@@ -538,12 +510,21 @@ if __name__ == "__main__":
         diff_best_bin_sub, diff_best_win_rate_sub, best_avg_diff_sub = (
             plot_length_diff_preference_chart(
                 diff_bin_stats_sub,
-                get_chart_output_path(order_index, slug),
+                get_output_path(
+                    "picture",
+                    LENGTH_CHART_FILE_TEMPLATE.format(order_index=order_index, slug=slug),
+                ),
                 title_suffix=f" [{tag}]"
             )
         )
 
-        create_statistical_table(diff_bin_stats_sub, get_table_output_path(order_index, slug))
+        create_statistical_table(
+            diff_bin_stats_sub,
+            get_output_path(
+                "table",
+                LENGTH_TABLE_FILE_TEMPLATE.format(order_index=order_index, slug=slug),
+            ),
+        )
 
         # 以追加模式写入同一报告
         generate_analysis_report(

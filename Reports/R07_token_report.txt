@@ -6,21 +6,53 @@ token 校验分析报告
 ----------------------------------------------------------------------------------------------------
 分析文件: D:\Files\MUC-QMJH\Data\integrated_data\integrated_data.parquet
 数据总行数: 135634
-conversation_b role='user' 的 num_tokens 与 sum_user_tokens 不一致行数: 27319
-conversation_b role='assistant' 的 num_tokens 与 sum_assistant_b_tokens 不一致行数: 0
-conversation_b role='user' 的 num_tokens 超过 sum_user_tokens 行数: 0
 缺失 conv_metadata 的行数: 0
-缺失 token 汇总字段的行数: 0
+conversation_a 非列表结构或缺失的行数: 0
 conversation_b 非列表结构或缺失的行数: 0
 无效 segment 记录总数: 0
 
-2. conversation_b role 分布
+2. conv_metadata token 字段存在性
 ----------------------------------------------------------------------------------------------------
-role 类型数量: 2
-user: 171054
-assistant: 171054
+sum_assistant_a_tokens  : key存在 135,634 行 | key缺失       0 行 | value为None       0 行
+sum_assistant_b_tokens  : key存在 135,634 行 | key缺失       0 行 | value为None       0 行
+sum_user_tokens         : key存在 135,634 行 | key缺失       0 行 | value为None       0 行
+context_a_tokens        : key存在 135,634 行 | key缺失       0 行 | value为None       0 行
+context_b_tokens        : key存在 135,634 行 | key缺失       0 行 | value为None       0 行
 
-3. 部分不一致示例
+3. conversation 逐消息 token 结构
+----------------------------------------------------------------------------------------------------
+conversation_a segment 总数: 342108
+conversation_a 含 num_tokens 的 segment 数: 0
+conversation_a 含 num_tokens 的行数: 0
+conversation_a assistant segment 总数: 171054
+conversation_a assistant 且含 num_tokens 的 segment 数: 0
+conversation_b segment 总数: 342108
+conversation_b 含 num_tokens 的 segment 数: 342108
+conversation_b 含 num_tokens 的行数: 135634
+conversation_b user 且含 num_tokens 的 segment 数: 171054
+conversation_b assistant 且含 num_tokens 的 segment 数: 171054
+
+conversation_a role 分布
+  user: 171054
+  assistant: 171054
+conversation_b role 分布
+  user: 171054
+  assistant: 171054
+
+4. 汇总一致性校验
+----------------------------------------------------------------------------------------------------
+conversation_b role='user' 的 num_tokens 与 sum_user_tokens 不一致行数: 27319
+conversation_b role='assistant' 的 num_tokens 与 sum_assistant_b_tokens 不一致行数: 0
+conversation_b role='user' 的 num_tokens 超过 sum_user_tokens 行数: 0
+
+5. 审计结论
+----------------------------------------------------------------------------------------------------
+- conversation_b 提供逐消息 num_tokens，可直接对照 sum_user_tokens 与 sum_assistant_b_tokens。
+- conversation_a 的 assistant 段未检测到对等的逐消息 num_tokens，因此 sum_assistant_a_tokens 当前只能确认存在，不能像 B 侧那样直接求和复核。
+- conv_metadata 中存在 context_a_tokens 与 context_b_tokens，但本脚本当前只完成字段存在性审计，尚未确认其严格语义与下游用途。
+- 原始数据未发现显式的 per-turn token 字段；当前可见的是 conv_metadata 的 Order 级汇总，以及 conversation_b 的逐消息 num_tokens。
+
+6. 部分不一致示例
 ----------------------------------------------------------------------------------------------------
                                       id sum_user_tokens      user_total    sum_assistant_b_tokens assistant_total
 ----------------------------------------------------------------------------------------------------
@@ -36,5 +68,5 @@ assistant: 171054
     d7d6b358-a1be-4d88-aed1-ab93fcd47985              17              11                       493             493
 
 ================================================================================
-报告生成时间: 2026-04-17 10:28:49
+报告生成时间: 2026-05-06 18:23:26
 ================================================================================

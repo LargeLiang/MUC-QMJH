@@ -25,33 +25,40 @@
 - 文件：`introduction_phase_1.md`
 - 核心问题：我们到底在研究什么？数据长什么样？为什么第一步不是做统计，而是做数据审计？
 - 对应脚本：C01-C03
+- 关键产物：`integrated_data.parquet` 与“先确认研究对象，再进入分析”的工程视角
 
 ### Phase 2：理解数据是怎样被清洗成“可分析对象”的
 - 文件：`introduction_phase_2.md`
-- 核心问题：为什么原始数据不能直接分析？为什么只保留 `evaluation_order = 1`？为什么要做扁平化和子集划分？
+- 核心问题：为什么原始数据不能直接分析？为什么只保留 `evaluation_order = 1`？为什么要做结构重组和子集划分？
 - 对应脚本：C04-C13
+- 关键产物：`optimized_data.parquet` 的 nested schema、20 个分类子集文件，以及一套稳定的分析字段口径
 
 ### Phase 3：从图表观察走到统计检验
 - 文件：`introduction_phase_3.md`
 - 核心问题：看见趋势之后，如何判断它不是偶然？为什么要用 Wilcoxon、Bootstrap、Bonferroni、卡方检验？
 - 对应脚本：C14-C17
+- 关键产物：描述性图表与汇总表、长度与格式偏好的正式统计检验结果
 
 ### Phase 4：理解“相关不等于因果”与稳健性验证
 - 文件：`introduction_phase_4.md`
-- 核心问题：为什么“更长”不一定真是原因？为什么要做控制变量、逻辑回归、IPW、匹配诊断？
-- 对应脚本：C18-C20
+- 核心问题：为什么“更长”或“更有格式”不一定真是原因？为什么要做嵌套回归、IPW、格式稳健性分析和匹配诊断？
+- 对应脚本：C18-C21
+- 关键产物：净效应汇总表、稳健性森林图、匹配平衡性诊断与 ATE 估计
 
 ### Phase 5：从净效应走向机制解释
 - 文件：`introduction_phase_5.md`
 - 核心问题：如果长度和格式真的影响偏好，它们是如何进入偏好形成过程的？SEM 在这里解决什么问题？
-- 对应脚本：C21
+- 对应脚本：C22
+- 关键产物：SEM 拟合指标、路径系数表、bootstrap 间接效应区间和机制图
 
 ---
 
 ## 3. 配套文件
 
-- `notebook_integration_plan.md`：说明为什么可以把工程集中到一个 Jupyter Notebook，以及目前 Phase 1 已完成到什么程度。
+- `notebook_integration_plan.md`：说明为什么可以把工程集中到一个 Jupyter Notebook，以及为什么当前更适合把 Notebook 当成教学封装层、把 `.py` 脚本保留为权威实现。
 - `paper_framework.md`：把项目逻辑、方法链和主要成果压缩成论文框架，方便从工程走向论文写作。
+- `data_structure_guide.md`：把项目里真正参与分析的数据结构拆开讲，适合在 Phase 2 前后辅助学生理解“结构为什么决定分析方式”。
+- `method_list.md`：把 C14-C22 真正进入结果解释的统计方法按首次出现顺序整理为 M01-M23，适合和 Phase 3-5 搭配阅读。
 
 ---
 
@@ -60,9 +67,9 @@
 如果你要给学生现场展示，建议采用下面这个顺序：
 
 1. 先看 `introduction_phase_1.md`，建立研究问题和文件地图。
-2. 打开 `Codes/C00_all_collection.ipynb`，现场演示 Phase 1 的三个脚本。
-3. 再看 `introduction_phase_2.md` 和 `introduction_phase_3.md`，让学生明白“数据如何变成结论”。
-4. 最后用 `introduction_phase_4.md`、`introduction_phase_5.md` 和 `paper_framework.md` 完成“研究方法课 + 项目总结”。
+2. 打开 `Codes/C00_all_collection.ipynb`，把它当成课堂演示封装层，现场调度 Phase 1 的三个脚本。
+3. 再看 `introduction_phase_2.md` 和 `introduction_phase_3.md`，让学生明白“数据如何变成结论”，并开始配合 `method_list.md` 阅读 M01-M09。
+4. 最后用 `introduction_phase_4.md`、`introduction_phase_5.md`、`method_list.md` 中的 M10-M23，以及 `paper_framework.md` 完成“研究方法课 + 项目总结”。
 
 ---
 
@@ -70,6 +77,6 @@
 
 这项研究不是“直接证明长回答更好”，而是沿着下面这条路线推进：
 
-**先确认数据可信，再提取可分析特征，再观察现象，再做统计检验，再控制混淆，再做稳健性验证，最后用机制模型解释偏好是如何形成的。**
+**先确认数据可信，再制造统一口径的分析字段，再观察现象，再做统计检验，再控制混淆、验证稳健性与可比性，最后用 SEM 解释偏好是如何形成的。**
 
 这也是学生最应该学到的研究思维。

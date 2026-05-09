@@ -17,18 +17,7 @@ import pandas as pd
 from pathlib import Path
 from collections import Counter
 
-
-def get_integrated_parquet_path(root: Path | str | None = None) -> Path:
-    """返回整合数据 parquet 文件的默认路径。"""
-
-    # 支持传入自定义根目录，便于测试或在不同目录下运行脚本
-    if root is None:
-        root_path : Path = Path.cwd()
-    else:
-        root_path : Path = Path(root)
-
-    # 整合数据文件位于项目根目录下的 Data/integrated_data/integrated_data.parquet
-    return root_path / "Data" / "integrated_data" / "integrated_data.parquet"
+from accessor import get_data_path, get_output_dir, load_parquet_or_none
 
 
 def touch_cont(file_path: Path | str | None = None, output_dir: Path | str | None = None) -> None:
@@ -36,17 +25,24 @@ def touch_cont(file_path: Path | str | None = None, output_dir: Path | str | Non
     分析整合数据中 conversation_a 和 conversation_b 的 content 结构。
 
     统计 content 长度分布，以及 type、text、image、mimeType 的分布情况。
+
+    参数说明：
+    - file_path：待分析的整合数据 parquet 文件路径（默认值为 integrated_data.parquet）
+    - output_dir：报告输出目录（默认值为当前工作目录下的 Reports）
+
+    返回值：
+    - 无返回值，直接输出报告文件并在控制台打印摘要
     """
 
     # 支持传入自定义文件路径，便于测试或在不同目录下运行脚本
     if file_path is None:
-        file_path : Path = get_integrated_parquet_path()
+        file_path : Path = get_data_path("integrated")
     else:
         file_path : Path = Path(file_path)
 
     # 默认输出目录为当前工作目录下的 Reports
     if output_dir is None:
-        output_dir : Path = Path.cwd() / "Reports"
+        output_dir : Path = get_output_dir("report")
     else:
         output_dir : Path = Path(output_dir)
 
@@ -55,15 +51,8 @@ def touch_cont(file_path: Path | str | None = None, output_dir: Path | str | Non
 
     # 如果文件不存在，则输出警告并返回
     print(f"正在分析文件: {file_path}")
-    if not file_path.exists():
-        print(f"  ERROR: 文件不存在: {file_path}")
-        return
-
-    # 读取 parquet 文件，并对读取异常进行捕获
-    try:
-        df: pd.DataFrame = pd.read_parquet(file_path)
-    except Exception as exc:
-        print(f"  ERROR: 读取 parquet 文件失败: {exc}")
+    df: pd.DataFrame | None = load_parquet_or_none(file_path)
+    if df is None:
         return
 
     print(f"  读取成功，数据形状: {df.shape}")

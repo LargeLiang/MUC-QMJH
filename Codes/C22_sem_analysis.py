@@ -1,29 +1,16 @@
-# -*- coding: utf-8 -*-
 """
-结构方程模型（SEM）分析与方法报告生成。
+C22_sem_analysis
 
-基于 optimized_data.parquet 与 C18 构造的配对差异特征，
-拟合多中介观测变量 SEM，比较主模型与扩展模型，并用 bootstrap
-为关键路径与间接效应提供 95% 置信区间。
+基于配对差异特征拟合结构方程模型，并输出路径估计与 bootstrap 结果。
 
-主模型：
-- 中介：token_diff_ab, header_density_diff, bold_density_diff
-- 外生层：ability_diff, verbosity_diff, format_tendency_diff,
-          user_tokens, turns, 任务类型, criteria
-- 结果层：winner_a
+功能：
+- 构造 SEM 所需的外生层、中介层和结果层变量
+- 比较主模型与扩展模型并估计直接效应与间接效应
+- 输出表格、路径图、bootstrap 效应图和文本报告
 
-扩展模型：
-- 在主模型基础上额外纳入 list_density_diff，作为敏感性分析。
-
-输出：
-- Reports/R20_sem_analysis_report.txt
-- Tables/T09_sem_layer_stats.csv
-- Tables/T10_sem_correlations.csv
-- Tables/T11_sem_model_comparison.csv
-- Tables/T12_sem_path_estimates.csv
-- Tables/T13_sem_bootstrap_effects_ci.csv
-- Pictures/P11_sem_path_diagram.png（若 graphviz 可用）
-- Pictures/P19_sem_bootstrap_effects_ci.png
+数据流向：
+    optimized_data.parquet 与 C18 配对特征 → SEM 建模与 bootstrap 估计 → Tables/T09_sem_layer_stats.csv 至 Tables/T13_sem_bootstrap_effects_ci.csv
+    + Reports/R20_sem_analysis_report.txt + Pictures/P11_sem_path_diagram.png + Pictures/P19_sem_bootstrap_effects_ci.png
 """
 
 from __future__ import annotations
@@ -39,10 +26,18 @@ import numpy as np
 import pandas as pd
 from semopy import Model, calc_stats, semplot
 
+from accessor import (
+    build_output_paths,
+    get_data_path,
+    get_output_path,
+)
 from C18_pure_effect import add_pair_features, build_model_stats, load_data_global
+from stats_utils import zscore_series
 
 
-CONTINUOUS_EXOG: list[str] = [
+# 这些列名对应 C18 / accessor 在分析阶段派生的临时列，
+# 不代表 optimized_data.parquet 的持久顶层 schema。
+ANALYSIS_CONTINUOUS_EXOG_COLS: list[str] = [
     "ability_diff",
     "verbosity_diff",
     "format_tendency_diff",
@@ -50,7 +45,7 @@ CONTINUOUS_EXOG: list[str] = [
     "turns",
 ]
 
-BINARY_EXOG: list[str] = [
+ANALYSIS_BINARY_EXOG_COLS: list[str] = [
     "creative_writing_bool",
     "if_bool",
     "math_bool",
@@ -64,15 +59,15 @@ BINARY_EXOG: list[str] = [
     "technical_accuracy",
 ]
 
-PRIMARY_MEDIATORS: list[str] = [
+PRIMARY_MEDIATOR_COLS: list[str] = [
     "token_diff_ab",
     "header_density_diff",
     "bold_density_diff",
 ]
 
-SUPPLEMENTARY_MEDIATORS: list[str] = ["list_density_diff"]
+SUPPLEMENTARY_MEDIATOR_COLS: list[str] = ["list_density_diff"]
 
-OUTCOME_COL = "winner_a"
+OUTCOME_ANALYSIS_COL = "winner_a"
 
 EFFECT_LABELS_EN: dict[str, str] = {
     "长度直接效应": "Length direct",
@@ -108,58 +103,6 @@ KEY_FIT_METRICS: list[str] = [
     "BIC",
 ]
 
-
-def get_optimized_parquet_path(root: Path | str | None = None) -> Path:
-    """返回优化后 parquet 文件路径。"""
-    if root is None:
-        root = Path.cwd()
-    return Path(root) / "Data" / "optimized_data" / "optimized_data.parquet"
-
-
-def get_report_path(root: Path | str | None = None) -> Path:
-    """返回 SEM 主报告路径。"""
-    if root is None:
-        root = Path.cwd()
-    return Path(root) / "Reports" / "R20_sem_analysis_report.txt"
-
-
-def get_table_paths(root: Path | str | None = None) -> dict[str, Path]:
-    """返回 SEM 相关表格输出路径。"""
-    if root is None:
-        root = Path.cwd()
-    table_dir = Path(root) / "Tables"
-    return {
-        "layer": table_dir / "T09_sem_layer_stats.csv",
-        "corr": table_dir / "T10_sem_correlations.csv",
-        "model": table_dir / "T11_sem_model_comparison.csv",
-        "paths": table_dir / "T12_sem_path_estimates.csv",
-        "boot": table_dir / "T13_sem_bootstrap_effects_ci.csv",
-    }
-
-
-def get_picture_path(root: Path | str | None = None) -> Path:
-    """返回 SEM 路径图输出路径。"""
-    if root is None:
-        root = Path.cwd()
-    return Path(root) / "Pictures" / "P11_sem_path_diagram.png"
-
-
-def get_bootstrap_picture_path(root: Path | str | None = None) -> Path:
-    """返回 SEM bootstrap 效应图输出路径。"""
-    if root is None:
-        root = Path.cwd()
-    return Path(root) / "Pictures" / "P19_sem_bootstrap_effects_ci.png"
-
-
-def _zscore(series: pd.Series) -> pd.Series:
-    """对连续变量做 z-score 标准化，常数列返回 0。"""
-    mu = float(series.mean())
-    sigma = float(series.std(ddof=1))
-    if sigma <= 0 or np.isnan(sigma):
-        return pd.Series(np.zeros(len(series)), index=series.index, dtype=float)
-    return ((series - mu) / sigma).astype(float)
-
-
 def _fit_stats_to_dict(stats_df: pd.DataFrame) -> dict[str, float]:
     """将 semopy calc_stats 输出整理为扁平字典。"""
     if stats_df.empty:
@@ -186,27 +129,27 @@ def prepare_sem_data(
     - sem_df：连续变量已 z 标准化、全列已转 float 的建模表
     """
     if file_path is None:
-        file_path = get_optimized_parquet_path()
+        file_path = get_data_path("optimized")
 
     df_global = load_data_global(file_path)
     model_stats = build_model_stats(df_global)
     df = add_pair_features(df_global, model_stats)
 
-    keep_cols = (
-        [OUTCOME_COL]
-        + CONTINUOUS_EXOG
-        + BINARY_EXOG
-        + PRIMARY_MEDIATORS
-        + SUPPLEMENTARY_MEDIATORS
+    analysis_cols = (
+        [OUTCOME_ANALYSIS_COL]
+        + ANALYSIS_CONTINUOUS_EXOG_COLS
+        + ANALYSIS_BINARY_EXOG_COLS
+        + PRIMARY_MEDIATOR_COLS
+        + SUPPLEMENTARY_MEDIATOR_COLS
     )
 
-    raw_df = df[keep_cols].dropna().copy()
+    raw_df = df[analysis_cols].dropna().copy()
     if max_n is not None and len(raw_df) > max_n:
         raw_df = raw_df.sample(n=max_n, random_state=seed).copy()
 
     sem_df = raw_df.copy()
-    for col in CONTINUOUS_EXOG + PRIMARY_MEDIATORS + SUPPLEMENTARY_MEDIATORS:
-        sem_df[col] = _zscore(sem_df[col])
+    for col in ANALYSIS_CONTINUOUS_EXOG_COLS + PRIMARY_MEDIATOR_COLS + SUPPLEMENTARY_MEDIATOR_COLS:
+        sem_df[col] = zscore_series(sem_df[col])
 
     for col in sem_df.columns:
         sem_df[col] = sem_df[col].astype(float)
@@ -221,15 +164,15 @@ def build_layer_stats(raw_df: pd.DataFrame) -> pd.DataFrame:
     返回字段包括：均值、标准差、四分位数、缺失率、二值变量占比。
     """
     layer_map: dict[str, tuple[str, str]] = {}
-    for col in CONTINUOUS_EXOG:
+    for col in ANALYSIS_CONTINUOUS_EXOG_COLS:
         layer_map[col] = ("外生层", "连续")
-    for col in BINARY_EXOG:
+    for col in ANALYSIS_BINARY_EXOG_COLS:
         layer_map[col] = ("外生层", "二值")
-    for col in PRIMARY_MEDIATORS:
+    for col in PRIMARY_MEDIATOR_COLS:
         layer_map[col] = ("中介层（主模型）", "连续")
-    for col in SUPPLEMENTARY_MEDIATORS:
+    for col in SUPPLEMENTARY_MEDIATOR_COLS:
         layer_map[col] = ("中介层（扩展模型）", "连续")
-    layer_map[OUTCOME_COL] = ("结果层", "二值")
+    layer_map[OUTCOME_ANALYSIS_COL] = ("结果层", "二值")
 
     rows: list[dict[str, float | str]] = []
     for col in raw_df.columns:
@@ -260,8 +203,13 @@ def build_layer_stats(raw_df: pd.DataFrame) -> pd.DataFrame:
 
 def build_correlation_table(raw_df: pd.DataFrame) -> pd.DataFrame:
     """构建关键连续变量与结果变量的相关矩阵。"""
-    corr_cols = CONTINUOUS_EXOG + PRIMARY_MEDIATORS + SUPPLEMENTARY_MEDIATORS + [OUTCOME_COL]
-    corr_df = raw_df[corr_cols].astype(float).corr(method="pearson")
+    analysis_corr_cols = (
+        ANALYSIS_CONTINUOUS_EXOG_COLS
+        + PRIMARY_MEDIATOR_COLS
+        + SUPPLEMENTARY_MEDIATOR_COLS
+        + [OUTCOME_ANALYSIS_COL]
+    )
+    corr_df = raw_df[analysis_corr_cols].astype(float).corr(method="pearson")
     corr_df.index.name = "variable"
     return corr_df.reset_index()
 
@@ -271,23 +219,26 @@ def build_sem_description(include_list: bool = False) -> str:
     生成 SEM 模型语法。
 
     主模型不纳入 list_density_diff；扩展模型将其作为敏感性分析路径。
+
+    这里使用的列名都是 C18 / accessor 派生的分析列名，
+    不要求 optimized_data.parquet 在顶层持久化这些字段。
     """
-    token_rhs = CONTINUOUS_EXOG + BINARY_EXOG
-    format_rhs = CONTINUOUS_EXOG + BINARY_EXOG + ["token_diff_ab"]
-    outcome_rhs = CONTINUOUS_EXOG + BINARY_EXOG + PRIMARY_MEDIATORS.copy()
+    token_rhs_cols = ANALYSIS_CONTINUOUS_EXOG_COLS + ANALYSIS_BINARY_EXOG_COLS
+    format_rhs_cols = ANALYSIS_CONTINUOUS_EXOG_COLS + ANALYSIS_BINARY_EXOG_COLS + ["token_diff_ab"]
+    outcome_rhs_cols = ANALYSIS_CONTINUOUS_EXOG_COLS + ANALYSIS_BINARY_EXOG_COLS + PRIMARY_MEDIATOR_COLS.copy()
     if include_list:
-        outcome_rhs += SUPPLEMENTARY_MEDIATORS
+        outcome_rhs_cols += SUPPLEMENTARY_MEDIATOR_COLS
 
     lines = [
-        f"token_diff_ab ~ {' + '.join(token_rhs)}",
-        f"header_density_diff ~ {' + '.join(format_rhs)}",
-        f"bold_density_diff ~ {' + '.join(format_rhs)}",
+        f"token_diff_ab ~ {' + '.join(token_rhs_cols)}",
+        f"header_density_diff ~ {' + '.join(format_rhs_cols)}",
+        f"bold_density_diff ~ {' + '.join(format_rhs_cols)}",
     ]
 
     if include_list:
-        lines.append(f"list_density_diff ~ {' + '.join(format_rhs)}")
+        lines.append(f"list_density_diff ~ {' + '.join(format_rhs_cols)}")
 
-    lines.append(f"{OUTCOME_COL} ~ {' + '.join(outcome_rhs)}")
+    lines.append(f"{OUTCOME_ANALYSIS_COL} ~ {' + '.join(outcome_rhs_cols)}")
     lines.append("header_density_diff ~~ bold_density_diff")
     if include_list:
         lines.append("header_density_diff ~~ list_density_diff")
@@ -341,11 +292,11 @@ def calculate_effects(estimates: pd.DataFrame, include_list: bool = False) -> di
     - ability_diff 通过长度/格式的间接效应
     - verbosity_diff 与 format_tendency_diff 的代表性间接效应
     """
-    token_to_win = _extract_path(estimates, OUTCOME_COL, "token_diff_ab")
-    header_to_win = _extract_path(estimates, OUTCOME_COL, "header_density_diff")
-    bold_to_win = _extract_path(estimates, OUTCOME_COL, "bold_density_diff")
-    ability_to_win = _extract_path(estimates, OUTCOME_COL, "ability_diff")
-    list_to_win = _extract_path(estimates, OUTCOME_COL, "list_density_diff")
+    token_to_win = _extract_path(estimates, OUTCOME_ANALYSIS_COL, "token_diff_ab")
+    header_to_win = _extract_path(estimates, OUTCOME_ANALYSIS_COL, "header_density_diff")
+    bold_to_win = _extract_path(estimates, OUTCOME_ANALYSIS_COL, "bold_density_diff")
+    ability_to_win = _extract_path(estimates, OUTCOME_ANALYSIS_COL, "ability_diff")
+    list_to_win = _extract_path(estimates, OUTCOME_ANALYSIS_COL, "list_density_diff")
 
     ability_to_token = _extract_path(estimates, "token_diff_ab", "ability_diff")
     ability_to_header = _extract_path(estimates, "header_density_diff", "ability_diff")
@@ -357,7 +308,7 @@ def calculate_effects(estimates: pd.DataFrame, include_list: bool = False) -> di
     fmt_to_header = _extract_path(estimates, "header_density_diff", "format_tendency_diff")
     fmt_to_bold = _extract_path(estimates, "bold_density_diff", "format_tendency_diff")
     fmt_to_list = _extract_path(estimates, "list_density_diff", "format_tendency_diff")
-    fmt_to_win = _extract_path(estimates, OUTCOME_COL, "format_tendency_diff")
+    fmt_to_win = _extract_path(estimates, OUTCOME_ANALYSIS_COL, "format_tendency_diff")
 
     effects: dict[str, float] = {
         "长度直接效应": token_to_win,
@@ -658,10 +609,10 @@ def generate_report(
     lines.append("")
     lines.append("【数据与建模口径】")
     lines.append(f"  样本量：{len(raw_df):,}")
-    lines.append("  数据来源：optimized_data.parquet + C18 配对差异特征")
-    lines.append("  结果变量：winner_a（A 获胜=1）")
-    lines.append("  主模型中介：token_diff_ab, header_density_diff, bold_density_diff")
-    lines.append("  扩展模型：在主模型基础上加入 list_density_diff（敏感性分析）")
+    lines.append("  数据来源：optimized_data.parquet（nested schema） + C18 loader / add_pair_features 派生的分析列")
+    lines.append("  结果变量：winner_a（A 获胜=1，分析阶段派生列）")
+    lines.append("  主模型中介：token_diff_ab, header_density_diff, bold_density_diff（均为分析阶段派生列）")
+    lines.append("  扩展模型：在主模型基础上加入 list_density_diff（敏感性分析；同为派生列）")
     lines.append(f"  Bootstrap 次数：{bootstrap_n}")
     lines.append("")
 
@@ -700,7 +651,7 @@ def generate_report(
     show_paths = primary_paths[
         (primary_paths["op"] == "~")
         & (
-            primary_paths["lval"].isin([OUTCOME_COL] + PRIMARY_MEDIATORS)
+            primary_paths["lval"].isin([OUTCOME_ANALYSIS_COL] + PRIMARY_MEDIATOR_COLS)
         )
     ].copy()
     for _, row in show_paths.iterrows():
@@ -723,7 +674,7 @@ def generate_report(
     lines.append("  1. 主模型将长度差与标题/粗体密度差作为并列中介，能够同时刻画内容冗长度与格式化程度对偏好的直接影响。")
     lines.append("  2. 扩展模型保留 list_density_diff 仅作敏感性分析，以避免将 C18 已识别的抑制效应直接写入主结论。")
     lines.append("  3. Bootstrap 置信区间用于补充 semopy 的正态近似标准误，尤其适合间接效应这类乘积项。")
-    lines.append("  4. prompt-level 变量（任务类型与 criteria）在本模型中仅作为外生控制，不作为中介解释链条。")
+    lines.append("  4. prompt-level 变量（任务类型与 criteria）在本模型中仅作为外生控制，不作为中介解释链条；它们同样来自 nested schema 的临时分析列。")
     lines.append(
         "  5. 路径图{}。".format("已保存到 Pictures/P11_sem_path_diagram.png" if plot_saved else "未生成（graphviz 依赖不可用）")
     )
@@ -758,12 +709,21 @@ def run_sem_analysis(
     返回值：输出文件路径字典。
     """
     if report_dir is None:
-        report_path = get_report_path()
+        report_path = get_output_path("report", "R20_sem_analysis_report.txt")
     else:
         report_path = Path(report_dir) / "R20_sem_analysis_report.txt"
 
     if table_dir is None:
-        table_paths = get_table_paths()
+        table_paths = build_output_paths(
+            "table",
+            {
+                "layer": "T09_sem_layer_stats.csv",
+                "corr": "T10_sem_correlations.csv",
+                "model": "T11_sem_model_comparison.csv",
+                "paths": "T12_sem_path_estimates.csv",
+                "boot": "T13_sem_bootstrap_effects_ci.csv",
+            },
+        )
     else:
         table_root = Path(table_dir)
         table_paths = {
@@ -775,8 +735,8 @@ def run_sem_analysis(
         }
 
     if picture_dir is None:
-        picture_path = get_picture_path()
-        bootstrap_picture_path = get_bootstrap_picture_path()
+        picture_path = get_output_path("picture", "P11_sem_path_diagram.png")
+        bootstrap_picture_path = get_output_path("picture", "P19_sem_bootstrap_effects_ci.png")
     else:
         picture_path = Path(picture_dir) / "P11_sem_path_diagram.png"
         bootstrap_picture_path = Path(picture_dir) / "P19_sem_bootstrap_effects_ci.png"
