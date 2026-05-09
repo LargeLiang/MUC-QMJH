@@ -9,8 +9,8 @@ C19_length_effect_robust
 - 输出稳健性汇总表、森林图和文本报告
 
 数据流向：
-    optimized_data.parquet 与 C13 子集 parquet → 长度稳健性估计 → Tables/T14_length_robust_summary.csv
-    + Reports/R17_length_effect_robust_report.txt + Pictures/P16_length_robust_forest.png
+    optimized_data.parquet 与 C13 子集 parquet → 长度稳健性估计 → Tables/T07_length_robust_summary.csv
+    + Reports/R17_length_effect_robust_report.txt + Pictures/P10_length_robust_forest.png
 """
 
 from __future__ import annotations
@@ -49,6 +49,9 @@ CONTINUOUS_CONFOUNDERS: list[str] = [
     "list_density_diff",
     "bold_density_diff",
 ]
+
+LENGTH_ROBUST_TABLE_FILE = "T07_length_robust_summary.csv"
+LENGTH_ROBUST_PICTURE_FILE = "P10_length_robust_forest.png"
 
 def prepare_subset_for_robustness(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -386,14 +389,14 @@ def run_length_effect_robust(
         report_path = Path(report_dir) / "R17_length_effect_robust_report.txt"
 
     if table_dir is None:
-        table_path = get_output_path("table", "T14_length_robust_summary.csv", root)
+        table_path = get_output_path("table", LENGTH_ROBUST_TABLE_FILE, root)
     else:
-        table_path = Path(table_dir) / "T14_length_robust_summary.csv"
+        table_path = Path(table_dir) / LENGTH_ROBUST_TABLE_FILE
 
     if picture_dir is None:
-        picture_path = get_output_path("picture", "P16_length_robust_forest.png", root)
+        picture_path = get_output_path("picture", LENGTH_ROBUST_PICTURE_FILE, root)
     else:
-        picture_path = Path(picture_dir) / "P16_length_robust_forest.png"
+        picture_path = Path(picture_dir) / LENGTH_ROBUST_PICTURE_FILE
 
     report_path.parent.mkdir(parents=True, exist_ok=True)
     table_path.parent.mkdir(parents=True, exist_ok=True)

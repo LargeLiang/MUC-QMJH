@@ -151,7 +151,7 @@
   2. 扩展模型保留 list_density_diff 仅作敏感性分析，以避免将 C18 已识别的抑制效应直接写入主结论。
   3. Bootstrap 置信区间用于补充 semopy 的正态近似标准误，尤其适合间接效应这类乘积项。
   4. prompt-level 变量（任务类型与 criteria）在本模型中仅作为外生控制，不作为中介解释链条；它们同样来自 nested schema 的临时分析列。
-  5. 路径图已保存到 Pictures/P11_sem_path_diagram.png。
+  5. 路径图已保存到 Pictures/P13_sem_path_diagram.png。
 
 ================================================================================
 任务完成！

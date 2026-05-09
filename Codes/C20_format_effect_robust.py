@@ -9,8 +9,8 @@ C20_format_effect_robust
 - 输出稳健性汇总表、森林图和文本报告
 
 数据流向：
-    optimized_data.parquet 与 C13 子集 parquet → 格式稳健性估计 → Tables/T15_format_robust_summary.csv
-    + Reports/R18_format_effect_robust_report.txt + Pictures/P17_format_robust_forest.png
+    optimized_data.parquet 与 C13 子集 parquet → 格式稳健性估计 → Tables/T08_format_robust_summary.csv
+    + Reports/R18_format_effect_robust_report.txt + Pictures/P11_format_robust_forest.png
 """
 
 from __future__ import annotations
@@ -91,6 +91,9 @@ BASE_CONTINUOUS_CONFOUNDERS: list[str] = [
     "list_density_diff",
     "bold_density_diff",
 ]
+
+FORMAT_ROBUST_TABLE_FILE = "T08_format_robust_summary.csv"
+FORMAT_ROBUST_PICTURE_FILE = "P11_format_robust_forest.png"
 
 def prepare_subset_for_feature(df: pd.DataFrame, feature_col: str) -> pd.DataFrame:
     """
@@ -428,14 +431,14 @@ def run_format_effect_robust(
         report_path = Path(report_dir) / "R18_format_effect_robust_report.txt"
 
     if table_dir is None:
-        table_path = get_output_path("table", "T15_format_robust_summary.csv", root)
+        table_path = get_output_path("table", FORMAT_ROBUST_TABLE_FILE, root)
     else:
-        table_path = Path(table_dir) / "T15_format_robust_summary.csv"
+        table_path = Path(table_dir) / FORMAT_ROBUST_TABLE_FILE
 
     if picture_dir is None:
-        picture_path = get_output_path("picture", "P17_format_robust_forest.png", root)
+        picture_path = get_output_path("picture", FORMAT_ROBUST_PICTURE_FILE, root)
     else:
-        picture_path = Path(picture_dir) / "P17_format_robust_forest.png"
+        picture_path = Path(picture_dir) / FORMAT_ROBUST_PICTURE_FILE
 
     report_path.parent.mkdir(parents=True, exist_ok=True)
     table_path.parent.mkdir(parents=True, exist_ok=True)

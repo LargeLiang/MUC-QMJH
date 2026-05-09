@@ -9,8 +9,8 @@ C21_enhanced_matching_diagnostics
 - 输出诊断表、总览图和文本报告
 
 数据流向：
-    optimized_data.parquet 与 C13 子集 parquet → 倾向得分匹配与平衡性诊断 → Tables/T16_matching_summary.csv 与 Tables/T17_matching_balance.csv
-    + Reports/R19_enhanced_diagnostics_report.txt + Pictures/P18_matching_diagnostics_overview.png
+    optimized_data.parquet 与 C13 子集 parquet → 倾向得分匹配与平衡性诊断 → Tables/T09_matching_summary.csv 与 Tables/T10_matching_balance.csv
+    + Reports/R19_enhanced_diagnostics_report.txt + Pictures/P12_matching_diagnostics_overview.png
 """
 
 from __future__ import annotations
@@ -48,6 +48,13 @@ SUBSET_LABELS_EN = {
     "指令+数学+代码": "IF + Math + Code",
     "四类全含": "All four",
 }
+
+MATCHING_TABLE_FILES = {
+    "summary": "T09_matching_summary.csv",
+    "balance": "T10_matching_balance.csv",
+}
+
+MATCHING_PICTURE_FILE = "P12_matching_diagnostics_overview.png"
 
 def standardized_mean_difference(
     treated: pd.Series,
@@ -322,23 +329,20 @@ def run_matching_diagnostics(
     if table_dir is None:
         table_paths = build_output_paths(
             "table",
-            {
-                "summary": "T16_matching_summary.csv",
-                "balance": "T17_matching_balance.csv",
-            },
+            MATCHING_TABLE_FILES,
             root,
         )
     else:
         table_root = Path(table_dir)
         table_paths = {
-            "summary": table_root / "T16_matching_summary.csv",
-            "balance": table_root / "T17_matching_balance.csv",
+            "summary": table_root / MATCHING_TABLE_FILES["summary"],
+            "balance": table_root / MATCHING_TABLE_FILES["balance"],
         }
 
     if picture_dir is None:
-        picture_path = get_output_path("picture", "P18_matching_diagnostics_overview.png", root)
+        picture_path = get_output_path("picture", MATCHING_PICTURE_FILE, root)
     else:
-        picture_path = Path(picture_dir) / "P18_matching_diagnostics_overview.png"
+        picture_path = Path(picture_dir) / MATCHING_PICTURE_FILE
 
     report_path.parent.mkdir(parents=True, exist_ok=True)
     for path in table_paths.values():

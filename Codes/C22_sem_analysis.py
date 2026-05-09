@@ -9,8 +9,8 @@ C22_sem_analysis
 - 输出表格、路径图、bootstrap 效应图和文本报告
 
 数据流向：
-    optimized_data.parquet 与 C18 配对特征 → SEM 建模与 bootstrap 估计 → Tables/T09_sem_layer_stats.csv 至 Tables/T13_sem_bootstrap_effects_ci.csv
-    + Reports/R20_sem_analysis_report.txt + Pictures/P11_sem_path_diagram.png + Pictures/P19_sem_bootstrap_effects_ci.png
+    optimized_data.parquet 与 C18 配对特征 → SEM 建模与 bootstrap 估计 → Tables/T11_sem_layer_stats.csv 至 Tables/T15_sem_bootstrap_effects_ci.csv
+    + Reports/R20_sem_analysis_report.txt + Pictures/P13_sem_path_diagram.png + Pictures/P14_sem_bootstrap_effects_ci.png
 """
 
 from __future__ import annotations
@@ -102,6 +102,17 @@ KEY_FIT_METRICS: list[str] = [
     "AIC",
     "BIC",
 ]
+
+SEM_TABLE_FILES = {
+    "layer": "T11_sem_layer_stats.csv",
+    "corr": "T12_sem_correlations.csv",
+    "model": "T13_sem_model_comparison.csv",
+    "paths": "T14_sem_path_estimates.csv",
+    "boot": "T15_sem_bootstrap_effects_ci.csv",
+}
+
+SEM_PATH_PICTURE_FILE = "P13_sem_path_diagram.png"
+SEM_BOOTSTRAP_PICTURE_FILE = "P14_sem_bootstrap_effects_ci.png"
 
 def _fit_stats_to_dict(stats_df: pd.DataFrame) -> dict[str, float]:
     """将 semopy calc_stats 输出整理为扁平字典。"""
@@ -676,7 +687,7 @@ def generate_report(
     lines.append("  3. Bootstrap 置信区间用于补充 semopy 的正态近似标准误，尤其适合间接效应这类乘积项。")
     lines.append("  4. prompt-level 变量（任务类型与 criteria）在本模型中仅作为外生控制，不作为中介解释链条；它们同样来自 nested schema 的临时分析列。")
     lines.append(
-        "  5. 路径图{}。".format("已保存到 Pictures/P11_sem_path_diagram.png" if plot_saved else "未生成（graphviz 依赖不可用）")
+        "  5. 路径图{}。".format("已保存到 Pictures/P13_sem_path_diagram.png" if plot_saved else "未生成（graphviz 依赖不可用）")
     )
     lines.append("")
     lines.append("=" * 80)
@@ -716,30 +727,24 @@ def run_sem_analysis(
     if table_dir is None:
         table_paths = build_output_paths(
             "table",
-            {
-                "layer": "T09_sem_layer_stats.csv",
-                "corr": "T10_sem_correlations.csv",
-                "model": "T11_sem_model_comparison.csv",
-                "paths": "T12_sem_path_estimates.csv",
-                "boot": "T13_sem_bootstrap_effects_ci.csv",
-            },
+            SEM_TABLE_FILES,
         )
     else:
         table_root = Path(table_dir)
         table_paths = {
-            "layer": table_root / "T09_sem_layer_stats.csv",
-            "corr": table_root / "T10_sem_correlations.csv",
-            "model": table_root / "T11_sem_model_comparison.csv",
-            "paths": table_root / "T12_sem_path_estimates.csv",
-            "boot": table_root / "T13_sem_bootstrap_effects_ci.csv",
+            "layer": table_root / SEM_TABLE_FILES["layer"],
+            "corr": table_root / SEM_TABLE_FILES["corr"],
+            "model": table_root / SEM_TABLE_FILES["model"],
+            "paths": table_root / SEM_TABLE_FILES["paths"],
+            "boot": table_root / SEM_TABLE_FILES["boot"],
         }
 
     if picture_dir is None:
-        picture_path = get_output_path("picture", "P11_sem_path_diagram.png")
-        bootstrap_picture_path = get_output_path("picture", "P19_sem_bootstrap_effects_ci.png")
+        picture_path = get_output_path("picture", SEM_PATH_PICTURE_FILE)
+        bootstrap_picture_path = get_output_path("picture", SEM_BOOTSTRAP_PICTURE_FILE)
     else:
-        picture_path = Path(picture_dir) / "P11_sem_path_diagram.png"
-        bootstrap_picture_path = Path(picture_dir) / "P19_sem_bootstrap_effects_ci.png"
+        picture_path = Path(picture_dir) / SEM_PATH_PICTURE_FILE
+        bootstrap_picture_path = Path(picture_dir) / SEM_BOOTSTRAP_PICTURE_FILE
 
     report_path.parent.mkdir(parents=True, exist_ok=True)
     for path in table_paths.values():

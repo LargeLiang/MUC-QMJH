@@ -9,8 +9,8 @@ C16_length_test
 - 生成汇总表、总览图和文本报告
 
 数据流向：
-    optimized_data.parquet 与 C13 子集 parquet → 长度差值检验 → Tables/T18_length_wilcoxon_summary.csv
-    + Reports/R13_wilcoxon_length_test_report.txt + Pictures/P12_length_wilcoxon_overview.png
+    optimized_data.parquet 与 C13 子集 parquet → 长度差值检验 → Tables/T03_length_wilcoxon_summary.csv
+    + Reports/R13_wilcoxon_length_test_report.txt + Pictures/P06_length_wilcoxon_overview.png
 """
 
 import matplotlib.pyplot as plt
@@ -56,6 +56,9 @@ N_BOOTSTRAP = 1000
 
 # 效应量分级阈值（Cohen's 惯例）
 EFFECT_THRESHOLDS = [(0.1, "可忽略"), (0.3, "小"), (0.5, "中"), (float("inf"), "大")]
+
+LENGTH_TEST_TABLE_FILE = "T03_length_wilcoxon_summary.csv"
+LENGTH_TEST_PICTURE_FILE = "P06_length_wilcoxon_overview.png"
 
 # 核心计算
 
@@ -319,14 +322,14 @@ def run_length_test(data_dir: Path | str | None = None,
         report_dir = Path(report_dir)
 
     if table_dir is None:
-        table_path = get_output_path("table", "T18_length_wilcoxon_summary.csv", root)
+        table_path = get_output_path("table", LENGTH_TEST_TABLE_FILE, root)
     else:
-        table_path = Path(table_dir) / "T18_length_wilcoxon_summary.csv"
+        table_path = Path(table_dir) / LENGTH_TEST_TABLE_FILE
 
     if picture_dir is None:
-        picture_path = get_output_path("picture", "P12_length_wilcoxon_overview.png", root)
+        picture_path = get_output_path("picture", LENGTH_TEST_PICTURE_FILE, root)
     else:
-        picture_path = Path(picture_dir) / "P12_length_wilcoxon_overview.png"
+        picture_path = Path(picture_dir) / LENGTH_TEST_PICTURE_FILE
 
     report_dir.mkdir(parents=True, exist_ok=True)
     table_path.parent.mkdir(parents=True, exist_ok=True)

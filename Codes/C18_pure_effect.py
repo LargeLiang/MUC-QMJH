@@ -9,8 +9,8 @@ C18_pure_effect
 - 输出净效应汇总表、衰减图和方法报告
 
 数据流向：
-    optimized_data.parquet 与 C13 子集 parquet → 配对特征构造与嵌套模型拟合 → Tables/T20_*.csv 与 Tables/T21_*.csv
-    + Reports/R16_pure_effect_report.txt + Pictures/P14_length_confounding_attenuation.png + Pictures/P15_format_net_effect_heatmaps.png
+    optimized_data.parquet 与 C13 子集 parquet → 配对特征构造与嵌套模型拟合 → Tables/T05_*.csv 与 Tables/T06_*.csv
+    + Reports/R16_pure_effect_report.txt + Pictures/P08_length_confounding_attenuation.png + Pictures/P09_format_net_effect_heatmaps.png
 """
 
 import warnings
@@ -34,13 +34,13 @@ from accessor import (
 from stats_utils import zscore_series
 
 PURE_EFFECT_TABLE_FILES = {
-    "length": "T20_pure_length_net_effect_summary.csv",
-    "format": "T21_pure_format_net_effect_summary.csv",
+    "length": "T05_pure_length_net_effect_summary.csv",
+    "format": "T06_pure_format_net_effect_summary.csv",
 }
 
 PURE_EFFECT_PICTURE_FILES = {
-    "length": "P14_length_confounding_attenuation.png",
-    "format": "P15_format_net_effect_heatmaps.png",
+    "length": "P08_length_confounding_attenuation.png",
+    "format": "P09_format_net_effect_heatmaps.png",
 }
 
 
@@ -841,16 +841,16 @@ def run_pure_effect(
     else:
         table_root = Path(table_dir)
         table_paths = {
-            "length": table_root / "T20_pure_length_net_effect_summary.csv",
-            "format": table_root / "T21_pure_format_net_effect_summary.csv",
+            "length": table_root / PURE_EFFECT_TABLE_FILES["length"],
+            "format": table_root / PURE_EFFECT_TABLE_FILES["format"],
         }
     if picture_dir is None:
         picture_paths = build_output_paths("picture", PURE_EFFECT_PICTURE_FILES, root)
     else:
         picture_root = Path(picture_dir)
         picture_paths = {
-            "length": picture_root / "P14_length_confounding_attenuation.png",
-            "format": picture_root / "P15_format_net_effect_heatmaps.png",
+            "length": picture_root / PURE_EFFECT_PICTURE_FILES["length"],
+            "format": picture_root / PURE_EFFECT_PICTURE_FILES["format"],
         }
     subset_paths = get_analysis_subset_paths(root)
 

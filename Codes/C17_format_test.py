@@ -9,8 +9,8 @@ C17_format_test
 - 生成汇总表、热力图和文本报告
 
 数据流向：
-    optimized_data.parquet 与 C13 子集 parquet → 格式计数与密度检验 → Tables/T19_format_test_summary.csv
-    + Reports/R14_format_test_report.txt + Pictures/P13_format_effect_heatmaps.png
+    optimized_data.parquet 与 C13 子集 parquet → 格式计数与密度检验 → Tables/T04_format_test_summary.csv
+    + Reports/R14_format_test_report.txt + Pictures/P07_format_effect_heatmaps.png
 """
 
 import matplotlib.pyplot as plt
@@ -54,6 +54,9 @@ FEATURES = ["header", "list", "bold"]
 MIN_PAIRS = 30
 N_BOOTSTRAP = 1000
 BONFERRONI_K = len(FEATURES)
+
+FORMAT_TEST_TABLE_FILE = "T04_format_test_summary.csv"
+FORMAT_TEST_PICTURE_FILE = "P07_format_effect_heatmaps.png"
 
 
 def _build_paired(df: pd.DataFrame, feature: str
@@ -346,14 +349,14 @@ def run_format_test(data_dir: Path | str | None = None,
         report_dir = Path(report_dir)
 
     if table_dir is None:
-        table_path = get_output_path("table", "T19_format_test_summary.csv", root)
+        table_path = get_output_path("table", FORMAT_TEST_TABLE_FILE, root)
     else:
-        table_path = Path(table_dir) / "T19_format_test_summary.csv"
+        table_path = Path(table_dir) / FORMAT_TEST_TABLE_FILE
 
     if picture_dir is None:
-        picture_path = get_output_path("picture", "P13_format_effect_heatmaps.png", root)
+        picture_path = get_output_path("picture", FORMAT_TEST_PICTURE_FILE, root)
     else:
-        picture_path = Path(picture_dir) / "P13_format_effect_heatmaps.png"
+        picture_path = Path(picture_dir) / FORMAT_TEST_PICTURE_FILE
 
     report_dir.mkdir(parents=True, exist_ok=True)
     table_path.parent.mkdir(parents=True, exist_ok=True)

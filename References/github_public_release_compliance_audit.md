@@ -224,16 +224,16 @@
 
 以下 PNG 图像建议保留：
 
-- [Pictures/P01_original_feature_strcuture.png](../Pictures/P01_original_feature_strcuture.png)
+- [Pictures/P01_original_structure.png](../Pictures/P01_original_structure.png)
 - [Pictures/P02_chat_structure.png](../Pictures/P02_chat_structure.png)
-- [Pictures/P03_optimized_feature_structure.png](../Pictures/P03_optimized_feature_structure.png)
-- [Pictures/P05_length_diff_line_chart.png](../Pictures/P05_length_diff_line_chart.png) 及其子集图
-- [Pictures/P06_format_presence_bar_chart.png](../Pictures/P06_format_presence_bar_chart.png)
-- [Pictures/P07_header_count_line_chart.png](../Pictures/P07_header_count_line_chart.png)
-- [Pictures/P08_list_count_line_chart.png](../Pictures/P08_list_count_line_chart.png)
-- [Pictures/P09_bold_count_line_chart.png](../Pictures/P09_bold_count_line_chart.png)
-- [Pictures/P10_format_combination_bar_chart.png](../Pictures/P10_format_combination_bar_chart.png)
-- [Pictures/P11_sem_path_diagram.png](../Pictures/P11_sem_path_diagram.png)
+- [Pictures/P03_optimized_structure.png](../Pictures/P03_optimized_structure.png)
+- [Pictures/P04_01_full_length_diff_line_chart.png](../Pictures/P04_01_full_length_diff_line_chart.png) 及其子集图
+- [Pictures/P05_01_format_presence_bar_chart.png](../Pictures/P05_01_format_presence_bar_chart.png)
+- [Pictures/P05_02_header_count_line_chart.png](../Pictures/P05_02_header_count_line_chart.png)
+- [Pictures/P05_03_list_count_line_chart.png](../Pictures/P05_03_list_count_line_chart.png)
+- [Pictures/P05_04_bold_count_line_chart.png](../Pictures/P05_04_bold_count_line_chart.png)
+- [Pictures/P05_05_format_combination_bar_chart.png](../Pictures/P05_05_format_combination_bar_chart.png)
+- [Pictures/P13_sem_path_diagram.png](../Pictures/P13_sem_path_diagram.png)
 
 #### 建议移出
 
