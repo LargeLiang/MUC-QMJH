@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Dict
 from collections import Counter
 
-from accessor import get_data_path, get_output_dir, load_parquet_or_none
+from accessor import get_path, get_dir, load_parquet_or_none
 
 
 TOKEN_METADATA_FIELDS = [
@@ -49,13 +49,13 @@ def verify_token_correction(file_path: Path | str | None = None,
 
     # 支持传入自定义文件路径，便于测试或在不同目录下运行脚本
     if file_path is None:
-        file_path = get_data_path("integrated")
+        file_path = get_path("integrated")
     else:
         file_path = Path(file_path)
 
     # 默认输出目录为当前工作目录下的 Reports
     if output_dir is None:
-        output_dir = get_output_dir("report")
+        output_dir = get_dir("report")
     else:
         output_dir = Path(output_dir)
 

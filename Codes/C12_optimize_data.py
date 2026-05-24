@@ -22,10 +22,7 @@ from tqdm import tqdm
 from typing import Dict, Tuple
 from collections import Counter
 
-from accessor import get_data_dir, get_data_path, get_output_dir
-
-
-def check_qualification(row) -> Tuple[bool, str]:
+from accessor import get_dir, get_path, get_dir def check_qualification(row) -> Tuple[bool, str]:
     """
     检查单行数据是否符合优化条件。
 
@@ -311,19 +308,19 @@ def optimize_data(file_path: Path | str | None = None,
 
     # 支持传入自定义文件路径和输出目录，便于测试或在不同目录下运行脚本
     if file_path is None:
-        file_path = get_data_path("integrated")
+        file_path = get_path("integrated")
     else:
         file_path = Path(file_path)
 
     # 默认数据输出目录为当前工作目录下的 Data/optimized_data
     if data_dir is None:
-        data_dir = get_data_dir("optimized")
+        data_dir = get_dir("optimized")
     else:
         data_dir = Path(data_dir)
 
     # 默认报告输出目录为当前工作目录下的 Reports
     if report_dir is None:
-        report_dir = get_output_dir("report")
+        report_dir = get_dir("report")
     else:
         report_dir = Path(report_dir)
 
@@ -499,3 +496,5 @@ if __name__ == "__main__":
 
     # 执行数据优化
     optimize_data()
+
+

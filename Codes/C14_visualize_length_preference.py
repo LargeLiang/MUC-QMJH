@@ -24,10 +24,10 @@ import seaborn as sns
 import warnings
 
 from accessor import (
-    get_data_dir,
-    get_data_path,
-    get_output_dir,
-    get_output_path,
+    get_dir,
+    get_path,
+    get_dir,
+    get_path,
     load_parquet_or_none,
     with_length_tokens,
 )
@@ -307,7 +307,7 @@ def create_statistical_table(diff_bin_stats: pd.DataFrame,
     print("创建统计表格...")
 
     if output_path is None:
-        output_path = get_output_path(
+        output_path = get_path(
             "table",
             LENGTH_TABLE_FILE_TEMPLATE.format(order_index=1, slug="full"),
         )
@@ -364,7 +364,7 @@ def generate_analysis_report(diff_bin_stats: pd.DataFrame,
     print(f"生成分析报告（{section_tag}）...")
 
     if output_path is None:
-        output_path = get_output_path("report", LENGTH_REPORT_FILE)
+        output_path = get_path("report", LENGTH_REPORT_FILE)
     else:
         output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -424,10 +424,10 @@ if __name__ == "__main__":
     print("=" * 80)
 
     # 路径初始化
-    input_file_path = get_data_path("optimized")
-    chart_dir = get_output_dir("picture")
-    report_dir = get_output_dir("report")
-    table_dir = get_output_dir("table")
+    input_file_path = get_path("optimized")
+    chart_dir = get_dir("picture")
+    report_dir = get_dir("report")
+    table_dir = get_dir("table")
 
     # 创建必要的目录
     for d in [chart_dir, report_dir, table_dir]:
@@ -450,10 +450,10 @@ if __name__ == "__main__":
     length_data = prepare_length_data(df)
 
     # 1.1 保存解缠化缓存
-    save_length_data_cache(length_data, get_data_path("length", LENGTH_CACHE_FILE))
+    save_length_data_cache(length_data, get_path("length", LENGTH_CACHE_FILE))
 
     # 1.2 分箱 + 可视化
-    full_chart_path = get_output_path(
+    full_chart_path = get_path(
         "picture",
         LENGTH_CHART_FILE_TEMPLATE.format(order_index=1, slug="full"),
     )
@@ -465,14 +465,14 @@ if __name__ == "__main__":
     # 1.3 统计表格
     create_statistical_table(
         diff_bin_stats,
-        get_output_path(
+        get_path(
             "table",
             LENGTH_TABLE_FILE_TEMPLATE.format(order_index=1, slug="full"),
         ),
     )
 
     # 1.4 报告（首次写入，覆写模式）
-    report_path = get_output_path("report", LENGTH_REPORT_FILE)
+    report_path = get_path("report", LENGTH_REPORT_FILE)
     generate_analysis_report(
         diff_bin_stats, diff_best_bin, diff_best_win_rate, best_avg_diff,
         report_path, mode="w", section_tag="全量数据"
@@ -485,7 +485,7 @@ if __name__ == "__main__":
         (4, "math_true_data.parquet", "math_true", "MATH"),
         (5, "code_true_data.parquet", "code_true", "CODE"),
     ]
-    subset_dir = get_data_dir("subsets")
+    subset_dir = get_dir("subsets")
 
     for order_index, filename, slug, tag in subset_configs:
         subset_path = subset_dir / filename
@@ -501,7 +501,7 @@ if __name__ == "__main__":
         print(f"  子集形状: {df_sub.shape}")
 
         length_data_sub = prepare_length_data(df_sub)
-        save_length_data_cache(length_data_sub, get_data_path("length", f"{slug}_length_data.parquet"))
+        save_length_data_cache(length_data_sub, get_path("length", f"{slug}_length_data.parquet"))
 
         # 子集若样本量不足以 n_bins 分箱则降为 10 箱
         bins_sub = n_bins if len(length_data_sub) >= n_bins * 30 else 10
@@ -510,7 +510,7 @@ if __name__ == "__main__":
         diff_best_bin_sub, diff_best_win_rate_sub, best_avg_diff_sub = (
             plot_length_diff_preference_chart(
                 diff_bin_stats_sub,
-                get_output_path(
+                get_path(
                     "picture",
                     LENGTH_CHART_FILE_TEMPLATE.format(order_index=order_index, slug=slug),
                 ),
@@ -520,7 +520,7 @@ if __name__ == "__main__":
 
         create_statistical_table(
             diff_bin_stats_sub,
-            get_output_path(
+            get_path(
                 "table",
                 LENGTH_TABLE_FILE_TEMPLATE.format(order_index=order_index, slug=slug),
             ),
@@ -535,3 +535,4 @@ if __name__ == "__main__":
     print("\n" + "=" * 80)
     print("任务完成！")
     print("=" * 80)
+

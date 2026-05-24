@@ -22,33 +22,11 @@ from typing import Dict, List, Optional, Tuple
 
 from accessor import (
     get_analysis_subset_paths,
-    get_data_path,
-    get_output_path,
-    oriented_winner_density_difference,
-    oriented_winner_difference,
+    get_path,
     safe_int_count,
     with_flat_analysis_columns,
-)
-
-SUBSET_LABELS_EN = {
-    "全量": "Full",
-    "无类别": "No category",
-    "仅创意写作": "CW only",
-    "仅指令遵循": "IF only",
-    "仅数学": "Math only",
-    "仅代码": "Code only",
-    "创意+指令": "CW + IF",
-    "创意+数学": "CW + Math",
-    "创意+代码": "CW + Code",
-    "指令+数学": "IF + Math",
-    "指令+代码": "IF + Code",
-    "数学+代码": "Math + Code",
-    "创意+指令+数学": "CW + IF + Math",
-    "创意+指令+代码": "CW + IF + Code",
-    "创意+数学+代码": "CW + Math + Code",
-    "指令+数学+代码": "IF + Math + Code",
-    "四类全含": "All four",
-}
+    SUBSET_LABELS_EN)
+from table_export_utils import export_table_bundle
 
 FEATURES = ["header", "list", "bold"]
 MIN_PAIRS = 30
@@ -57,6 +35,26 @@ BONFERRONI_K = len(FEATURES)
 
 FORMAT_TEST_TABLE_FILE = "T04_format_test_summary.csv"
 FORMAT_TEST_PICTURE_FILE = "P07_format_effect_heatmaps.png"
+
+
+def _oriented_winner_difference(a_values: np.ndarray,
+                                b_values: np.ndarray,
+                                winner_values: np.ndarray) -> np.ndarray:
+    """按 winner 方向构造获胜方减落败方的差值数组。"""
+
+    return np.where(winner_values == "model_a", a_values - b_values, b_values - a_values)
+
+
+def _oriented_winner_density_difference(a_counts: np.ndarray,
+                                        b_counts: np.ndarray,
+                                        a_tokens: np.ndarray,
+                                        b_tokens: np.ndarray,
+                                        winner_values: np.ndarray) -> np.ndarray:
+    """按 winner 方向构造格式密度差值数组（计数除以 token 数，分母加 1 防除零）。"""
+
+    a_density = a_counts / (a_tokens + 1.0)
+    b_density = b_counts / (b_tokens + 1.0)
+    return _oriented_winner_difference(a_density, b_density, winner_values)
 
 
 def _build_paired(df: pd.DataFrame, feature: str
@@ -70,8 +68,8 @@ def _build_paired(df: pd.DataFrame, feature: str
     a_tok = df["a_tokens"].values.astype(np.float64)
     b_tok = df["b_tokens"].values.astype(np.float64)
 
-    count_diff = oriented_winner_difference(a_cnt, b_cnt, df["winner"].values)
-    density_diff = oriented_winner_density_difference(
+    count_diff = _oriented_winner_difference(a_cnt, b_cnt, df["winner"].values)
+    density_diff = _oriented_winner_density_difference(
         a_cnt,
         b_cnt,
         a_tok,
@@ -211,7 +209,7 @@ def run_one_subset(label: str, df: pd.DataFrame) -> Optional[Dict]:
             "ci_high":             round(ci_high, 3),
             "wilcoxon_stat":       stat,
             "p_value":             p_raw,
-            "p_bonferroni":        round(p_adj, 6),
+            "p_bonferroni":        p_adj,
             "rank_biserial_r":     round(r_rb, 4),
             "effect_level":        _effect_level(r_rb),
             "cohen_d":             cohen_d,
@@ -332,7 +330,7 @@ def run_format_test(data_dir: Path | str | None = None,
     """
     root = Path.cwd()
     default_subset_paths = get_analysis_subset_paths(root)
-    optimized_file_path = get_data_path("optimized", root=root)
+    optimized_file_path = get_path("optimized", root=root)
 
     if data_dir is None:
         subset_paths = default_subset_paths
@@ -344,17 +342,17 @@ def run_format_test(data_dir: Path | str | None = None,
         }
 
     if report_dir is None:
-        report_dir = get_output_path("report", "R14_format_test_report.txt", root).parent
+        report_dir = get_path("report", "R14_format_test_report.txt", root).parent
     else:
         report_dir = Path(report_dir)
 
     if table_dir is None:
-        table_path = get_output_path("table", FORMAT_TEST_TABLE_FILE, root)
+        table_path = get_path("table", FORMAT_TEST_TABLE_FILE, root)
     else:
         table_path = Path(table_dir) / FORMAT_TEST_TABLE_FILE
 
     if picture_dir is None:
-        picture_path = get_output_path("picture", FORMAT_TEST_PICTURE_FILE, root)
+        picture_path = get_path("picture", FORMAT_TEST_PICTURE_FILE, root)
     else:
         picture_path = Path(picture_dir) / FORMAT_TEST_PICTURE_FILE
 
@@ -388,7 +386,7 @@ def run_format_test(data_dir: Path | str | None = None,
 
     generate_report(all_results, report_dir)
     summary_df = build_summary_df(all_results)
-    summary_df.to_csv(table_path, index=False, encoding="utf-8-sig")
+    export_table_bundle(summary_df, table_path)
     plot_format_heatmaps(summary_df, picture_path)
     return {
         "report": report_dir / "R14_format_test_report.txt",
@@ -509,3 +507,4 @@ if __name__ == "__main__":
     print("\n" + "=" * 80)
     print("任务完成！")
     print("=" * 80)
+

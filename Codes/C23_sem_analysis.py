@@ -1,5 +1,5 @@
 """
-C22_sem_analysis
+C23_sem_analysis
 
 基于配对差异特征拟合结构方程模型，并输出路径估计与 bootstrap 结果。
 
@@ -10,7 +10,7 @@ C22_sem_analysis
 
 数据流向：
     optimized_data.parquet 与 C18 配对特征 → SEM 建模与 bootstrap 估计 → Tables/T11_sem_layer_stats.csv 至 Tables/T15_sem_bootstrap_effects_ci.csv
-    + Reports/R20_sem_analysis_report.txt + Pictures/P13_sem_path_diagram.png + Pictures/P14_sem_bootstrap_effects_ci.png
+    + Reports/R21_sem_analysis_report.txt + Pictures/P13_sem_path_diagram.png + Pictures/P14_sem_bootstrap_effects_ci.png
 """
 
 from __future__ import annotations
@@ -27,12 +27,11 @@ import pandas as pd
 from semopy import Model, calc_stats, semplot
 
 from accessor import (
-    build_output_paths,
-    get_data_path,
-    get_output_path,
+    get_path,
 )
-from C18_pure_effect import add_pair_features, build_model_stats, load_data_global
+from C18_pure_length_effect import add_pair_features, build_model_stats, load_data_global
 from stats_utils import zscore_series
+from table_export_utils import export_table_bundle
 
 
 # 这些列名对应 C18 / accessor 在分析阶段派生的临时列，
@@ -140,7 +139,7 @@ def prepare_sem_data(
     - sem_df：连续变量已 z 标准化、全列已转 float 的建模表
     """
     if file_path is None:
-        file_path = get_data_path("optimized")
+        file_path = get_path("optimized")
 
     df_global = load_data_global(file_path)
     model_stats = build_model_stats(df_global)
@@ -720,15 +719,15 @@ def run_sem_analysis(
     返回值：输出文件路径字典。
     """
     if report_dir is None:
-        report_path = get_output_path("report", "R20_sem_analysis_report.txt")
+        report_path = get_path("report", "R21_sem_analysis_report.txt")
     else:
-        report_path = Path(report_dir) / "R20_sem_analysis_report.txt"
+        report_path = Path(report_dir) / "R21_sem_analysis_report.txt"
 
     if table_dir is None:
-        table_paths = build_output_paths(
-            "table",
-            SEM_TABLE_FILES,
-        )
+        table_paths = {
+            name: get_path("table", file_name)
+            for name, file_name in SEM_TABLE_FILES.items()
+        }
     else:
         table_root = Path(table_dir)
         table_paths = {
@@ -740,8 +739,8 @@ def run_sem_analysis(
         }
 
     if picture_dir is None:
-        picture_path = get_output_path("picture", SEM_PATH_PICTURE_FILE)
-        bootstrap_picture_path = get_output_path("picture", SEM_BOOTSTRAP_PICTURE_FILE)
+        picture_path = get_path("picture", SEM_PATH_PICTURE_FILE)
+        bootstrap_picture_path = get_path("picture", SEM_BOOTSTRAP_PICTURE_FILE)
     else:
         picture_path = Path(picture_dir) / SEM_PATH_PICTURE_FILE
         bootstrap_picture_path = Path(picture_dir) / SEM_BOOTSTRAP_PICTURE_FILE
@@ -763,8 +762,8 @@ def run_sem_analysis(
     print("=" * 80)
     layer_stats = build_layer_stats(raw_df)
     corr_df = build_correlation_table(raw_df)
-    layer_stats.to_csv(table_paths["layer"], index=False, encoding="utf-8-sig")
-    corr_df.to_csv(table_paths["corr"], index=False, encoding="utf-8-sig")
+    export_table_bundle(layer_stats, table_paths["layer"])
+    export_table_bundle(corr_df, table_paths["corr"])
 
     print("=" * 80)
     print("3/6 拟合主模型与扩展模型")
@@ -782,10 +781,10 @@ def run_sem_analysis(
         {"model_name": "主模型", **primary_fit["fit_stats"]},
         {"model_name": "扩展模型", **extended_fit["fit_stats"]},
     ])
-    model_comparison.to_csv(table_paths["model"], index=False, encoding="utf-8-sig")
+    export_table_bundle(model_comparison, table_paths["model"])
 
     all_paths = pd.concat([primary_fit["estimates"], extended_fit["estimates"]], ignore_index=True)
-    all_paths.to_csv(table_paths["paths"], index=False, encoding="utf-8-sig")
+    export_table_bundle(all_paths, table_paths["paths"])
 
     print("=" * 80)
     print("4/6 计算主模型关键效应与 bootstrap 置信区间")
@@ -799,7 +798,7 @@ def run_sem_analysis(
         seed=seed,
     )
     bootstrap_summary = summarize_bootstrap(point_effects, boot_df)
-    bootstrap_summary.to_csv(table_paths["boot"], index=False, encoding="utf-8-sig")
+    export_table_bundle(bootstrap_summary, table_paths["boot"])
     plot_bootstrap_effects_ci(bootstrap_summary, bootstrap_picture_path)
 
     print("=" * 80)

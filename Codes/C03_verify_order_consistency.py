@@ -15,7 +15,7 @@ C03_verify_order_consistency
 import pandas as pd
 from pathlib import Path
 
-from accessor import get_data_path, load_parquet_or_none
+from accessor import get_path, load_parquet_or_none
 
 
 def verify_order_consistency(file_path: Path | str | None = None) -> None:
@@ -33,7 +33,7 @@ def verify_order_consistency(file_path: Path | str | None = None) -> None:
 
     # 支持传入自定义文件路径，便于测试或在不同目录下运行脚本
     if file_path is None:
-        file_path : Path = get_data_path("integrated")
+        file_path : Path = get_path("integrated")
     else:        
         file_path : Path = Path(file_path)
 

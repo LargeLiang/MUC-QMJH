@@ -22,9 +22,9 @@ import seaborn as sns
 import warnings
 
 from accessor import (
-    get_data_dir,
-    get_data_path,
-    get_output_dir,
+    get_dir,
+    get_path,
+    get_dir,
     load_parquet_or_none,
     safe_int_count,
     with_flat_analysis_columns,
@@ -516,7 +516,7 @@ def plot_presence_bar_chart(presence_df: pd.DataFrame,
     
     # 参数标准化：支持Path或str，默认使用Pictures目录
     if output_dir is None:
-        output_dir = get_output_dir("picture")
+        output_dir = get_dir("picture")
     else:
         output_dir = Path(output_dir)
     
@@ -626,7 +626,7 @@ def plot_count_feature_line_chart(count_stats: pd.DataFrame,
     
     # 第一步：参数标准化、目录准备和边界条件检查
     if output_dir is None:
-        output_dir = get_output_dir("picture")
+        output_dir = get_dir("picture")
     else:
         output_dir = Path(output_dir)
     
@@ -835,7 +835,7 @@ def plot_combination_bar_chart(combination_stats: pd.DataFrame,
     
     # 参数标准化：支持Path或str，默认使用Pictures目录
     if output_dir is None:
-        output_dir = get_output_dir("picture")
+        output_dir = get_dir("picture")
     else:
         output_dir = Path(output_dir)
     
@@ -935,7 +935,7 @@ def create_summary_tables(format_data: pd.DataFrame,
     
     # 参数标准化：支持Path或str，默认使用Tables目录
     if output_dir is None:
-        output_dir = get_output_dir("table")
+        output_dir = get_dir("table")
     else:
         output_dir = Path(output_dir)
     
@@ -1021,7 +1021,7 @@ def generate_analysis_report(format_data: pd.DataFrame,
     print(f"生成分析报告（{section_tag}）...")
 
     if output_dir is None:
-        output_dir = get_output_dir("report")
+        output_dir = get_dir("report")
     else:
         output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1108,10 +1108,10 @@ if __name__ == "__main__":
     print("=" * 80)
 
     # 1. 初始化路径
-    data_file_path = get_data_path("optimized")
-    charts_dir  = get_output_dir("picture")
-    reports_dir = get_output_dir("report")
-    tables_dir  = get_output_dir("table")
+    data_file_path = get_path("optimized")
+    charts_dir  = get_dir("picture")
+    reports_dir = get_dir("report")
+    tables_dir  = get_dir("table")
     for d in (charts_dir, reports_dir, tables_dir):
         d.mkdir(parents=True, exist_ok=True)
 
@@ -1131,7 +1131,7 @@ if __name__ == "__main__":
     format_data = prepare_format_data(df)
 
     # 1.1 缓存解缠化结果
-    format_data_path = get_data_path("format", FORMAT_CACHE_FILE)
+    format_data_path = get_path("format", FORMAT_CACHE_FILE)
     format_data_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         format_data.to_parquet(format_data_path, index=False)
@@ -1180,7 +1180,7 @@ if __name__ == "__main__":
         ("math_true_data.parquet",            "MATH（数学）"),
         ("code_true_data.parquet",            "CODE（代码）"),
     ]
-    subset_dir = get_data_dir("subsets")
+    subset_dir = get_dir("subsets")
 
     for filename, tag in subset_configs:
         subset_path = subset_dir / filename

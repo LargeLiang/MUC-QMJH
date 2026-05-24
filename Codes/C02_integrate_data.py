@@ -20,7 +20,25 @@ from time import perf_counter
 from typing import Iterable
 from tqdm import tqdm
 
-from accessor import get_data_dir, get_raw_parquet_file_paths
+from accessor import get_dir
+
+
+def get_raw_parquet_file_paths(root: Path | str | None = None,
+                               shard_count: int = 7) -> list[Path]:
+    """
+    返回项目根目录下的原始 parquet 分片路径列表。
+
+    参数说明：
+    - root：项目根目录（默认值为当前工作目录）
+    - shard_count：分片数量（默认值为 7）
+
+    返回值：
+    - 原始分片路径列表
+    """
+
+    root_path = Path.cwd() if root is None else Path(root)
+    data_dir = root_path / "Data" / "lmarena-aiarena-human-preference-140k" / "Data"
+    return [data_dir / f"train-{i:05d}-of-00007.parquet" for i in range(shard_count)]
 
 
 def save_parquet_with_progress(
@@ -89,7 +107,7 @@ def integrate_original_data(file_paths: Iterable[Path] | None = None, output_dir
 
     # 默认输出目录为当前工作目录下的 Data/integrated_data
     if output_dir is None:
-        output_dir : Path = get_data_dir("integrated")
+        output_dir : Path = get_dir("integrated")
     else:
         output_dir : Path = Path(output_dir)
 

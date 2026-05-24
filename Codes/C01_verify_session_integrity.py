@@ -14,12 +14,25 @@ C01_verify_session_integrity
 
 import pandas as pd
 from pathlib import Path
-from typing import Iterable
-
-from accessor import get_raw_parquet_file_paths
 
 
-def verify_session_integrity(file_paths: Iterable[Path] | None = None) -> None:
+def get_raw_parquet_file_paths(root: Path | str | None = None) -> list[Path]:
+    """
+    返回项目根目录下 7 个原始 parquet 分片路径。
+
+    参数说明：
+    - root：项目根目录（默认值为当前工作目录）
+
+    返回值：
+    - 7 个原始分片路径组成的列表
+    """
+
+    root_path = Path.cwd() if root is None else Path(root)
+    data_dir = root_path / "Data" / "lmarena-aiarena-human-preference-140k" / "Data"
+    return [data_dir / f"train-{i:05d}-of-00007.parquet" for i in range(7)]
+
+
+def verify_session_integrity(root: Path | str | None = None) -> None:
     """
     校验原始 parquet 分片中的 evaluation_session_id 是否跨文件重复。
 
@@ -27,17 +40,13 @@ def verify_session_integrity(file_paths: Iterable[Path] | None = None) -> None:
     出现在多个文件中，说明会话被拆分到不同分片。
 
     参数说明：
-    - file_paths：待校验的 parquet 文件路径列表（默认值为项目中的 7 个原始分片）
+    - root：项目根目录（默认值为当前工作目录）
 
     返回值：
     - 无返回值，直接在控制台输出校验结论
     """
 
-    # 支持传入自定义文件路径列表，便于测试或在不同目录下运行脚本
-    if file_paths is None:
-        file_paths : list[Path] = get_raw_parquet_file_paths()
-    else:
-        file_paths : list[Path] = list(file_paths)
+    file_paths: list[Path] = get_raw_parquet_file_paths(root)
 
     # 1. 初始化全局统计量
     # 用于存储所有处理文件中去重后的 session_id

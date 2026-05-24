@@ -22,31 +22,10 @@ from typing import Dict, List, Optional
 
 from accessor import (
     get_analysis_subset_paths,
-    get_data_path,
-    get_output_path,
-    oriented_winner_difference,
+    get_path,
     with_length_tokens,
-)
-
-SUBSET_LABELS_EN = {
-    "全量": "Full",
-    "无类别": "No category",
-    "仅创意写作": "CW only",
-    "仅指令遵循": "IF only",
-    "仅数学": "Math only",
-    "仅代码": "Code only",
-    "创意+指令": "CW + IF",
-    "创意+数学": "CW + Math",
-    "创意+代码": "CW + Code",
-    "指令+数学": "IF + Math",
-    "指令+代码": "IF + Code",
-    "数学+代码": "Math + Code",
-    "创意+指令+数学": "CW + IF + Math",
-    "创意+指令+代码": "CW + IF + Code",
-    "创意+数学+代码": "CW + Math + Code",
-    "指令+数学+代码": "IF + Math + Code",
-    "四类全含": "All four",
-}
+    SUBSET_LABELS_EN)
+from table_export_utils import export_table_bundle
 
 # 每个子集有效对数的最小阈值（低于此数则跳过）
 MIN_PAIRS = 30
@@ -62,6 +41,14 @@ LENGTH_TEST_PICTURE_FILE = "P06_length_wilcoxon_overview.png"
 
 # 核心计算
 
+
+def _oriented_winner_difference(a_values: np.ndarray,
+                                b_values: np.ndarray,
+                                winner_values: np.ndarray) -> np.ndarray:
+    """按 winner 方向构造获胜方减落败方的差值数组。"""
+
+    return np.where(winner_values == "model_a", a_values - b_values, b_values - a_values)
+
 def _build_diff(df: pd.DataFrame) -> np.ndarray:
     """
     构造 δᵢ = tokens(获胜模型) − tokens(落败模型)。
@@ -73,9 +60,9 @@ def _build_diff(df: pd.DataFrame) -> np.ndarray:
 
     mask = df["winner"].isin(["model_a", "model_b"])
     sub = df[mask].copy()
-    delta = oriented_winner_difference(
-        sub["a_tokens"].values,
-        sub["b_tokens"].values,
+    delta = _oriented_winner_difference(
+        sub["a_tokens"].values.astype(np.float64),
+        sub["b_tokens"].values.astype(np.float64),
         sub["winner"].values,
     )
     return delta.astype(np.float64)
@@ -305,7 +292,7 @@ def run_length_test(data_dir: Path | str | None = None,
 
     root = Path.cwd()
     default_subset_paths = get_analysis_subset_paths(root)
-    optimized_file_path = get_data_path("optimized", root=root)
+    optimized_file_path = get_path("optimized", root=root)
 
     if data_dir is None:
         subset_paths = default_subset_paths
@@ -317,17 +304,17 @@ def run_length_test(data_dir: Path | str | None = None,
         }
 
     if report_dir is None:
-        report_dir = get_output_path("report", "R13_wilcoxon_length_test_report.txt", root).parent
+        report_dir = get_path("report", "R13_wilcoxon_length_test_report.txt", root).parent
     else:
         report_dir = Path(report_dir)
 
     if table_dir is None:
-        table_path = get_output_path("table", LENGTH_TEST_TABLE_FILE, root)
+        table_path = get_path("table", LENGTH_TEST_TABLE_FILE, root)
     else:
         table_path = Path(table_dir) / LENGTH_TEST_TABLE_FILE
 
     if picture_dir is None:
-        picture_path = get_output_path("picture", LENGTH_TEST_PICTURE_FILE, root)
+        picture_path = get_path("picture", LENGTH_TEST_PICTURE_FILE, root)
     else:
         picture_path = Path(picture_dir) / LENGTH_TEST_PICTURE_FILE
 
@@ -361,12 +348,12 @@ def run_length_test(data_dir: Path | str | None = None,
     k = len(results)
     for res in results:
         adj_p = min(res["p_value"] * k, 1.0)
-        res["p_bonferroni"] = round(adj_p, 6)
+        res["p_bonferroni"] = adj_p
         res["significant"] = adj_p < 0.05
 
     generate_report(results, k, report_dir)
     summary_df = build_summary_df(results)
-    summary_df.to_csv(table_path, index=False, encoding="utf-8-sig")
+    export_table_bundle(summary_df, table_path)
     plot_length_overview(summary_df, picture_path)
     return {
         "report": report_dir / "R13_wilcoxon_length_test_report.txt",
@@ -463,3 +450,4 @@ if __name__ == "__main__":
     print("\n" + "=" * 80)
     print("任务完成！")
     print("=" * 80)
+

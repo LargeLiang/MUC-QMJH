@@ -1,5 +1,5 @@
 """
-C20_format_effect_robust
+C21_format_effect_robust
 
 评估格式密度处理变量在控制混淆因素后的稳健效应。
 
@@ -10,7 +10,7 @@ C20_format_effect_robust
 
 数据流向：
     optimized_data.parquet 与 C13 子集 parquet → 格式稳健性估计 → Tables/T08_format_robust_summary.csv
-    + Reports/R18_format_effect_robust_report.txt + Pictures/P11_format_robust_forest.png
+    + Reports/R19_format_effect_robust_report.txt + Pictures/P11_format_robust_forest.png
 """
 
 from __future__ import annotations
@@ -27,8 +27,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
-from accessor import get_analysis_subset_paths, get_output_path
-from C18_pure_effect import (
+from accessor import get_analysis_subset_paths, get_path, SUBSET_LABELS_EN
+from C18_pure_length_effect import (
     CRITERIA_COLS,
     FORMAT_DENSITY_VARS,
     TASK_TYPE_COLS,
@@ -37,6 +37,7 @@ from C18_pure_effect import (
     load_subset,
 )
 from stats_utils import active_nonconstant_columns, zscore_series
+from table_export_utils import export_table_bundle
 
 
 FORMAT_FEATURES: list[dict[str, str | bool]] = [
@@ -59,26 +60,6 @@ FORMAT_FEATURES: list[dict[str, str | bool]] = [
         "role": "敏感性分析",
     },
 ]
-
-SUBSET_LABELS_EN = {
-    "全量": "Full",
-    "无类别": "No category",
-    "仅创意写作": "CW only",
-    "仅指令遵循": "IF only",
-    "仅数学": "Math only",
-    "仅代码": "Code only",
-    "创意+指令": "CW + IF",
-    "创意+数学": "CW + Math",
-    "创意+代码": "CW + Code",
-    "指令+数学": "IF + Math",
-    "指令+代码": "IF + Code",
-    "数学+代码": "Math + Code",
-    "创意+指令+数学": "CW + IF + Math",
-    "创意+指令+代码": "CW + IF + Code",
-    "创意+数学+代码": "CW + Math + Code",
-    "指令+数学+代码": "IF + Math + Code",
-    "四类全含": "All four",
-}
 
 BASE_CONTINUOUS_CONFOUNDERS: list[str] = [
     "user_tokens",
@@ -426,17 +407,17 @@ def run_format_effect_robust(
     """执行完整的 R18 格式稳健性分析。"""
     root = Path.cwd()
     if report_dir is None:
-        report_path = get_output_path("report", "R18_format_effect_robust_report.txt", root)
+        report_path = get_path("report", "R19_format_effect_robust_report.txt", root)
     else:
-        report_path = Path(report_dir) / "R18_format_effect_robust_report.txt"
+        report_path = Path(report_dir) / "R19_format_effect_robust_report.txt"
 
     if table_dir is None:
-        table_path = get_output_path("table", FORMAT_ROBUST_TABLE_FILE, root)
+        table_path = get_path("table", FORMAT_ROBUST_TABLE_FILE, root)
     else:
         table_path = Path(table_dir) / FORMAT_ROBUST_TABLE_FILE
 
     if picture_dir is None:
-        picture_path = get_output_path("picture", FORMAT_ROBUST_PICTURE_FILE, root)
+        picture_path = get_path("picture", FORMAT_ROBUST_PICTURE_FILE, root)
     else:
         picture_path = Path(picture_dir) / FORMAT_ROBUST_PICTURE_FILE
 
@@ -490,7 +471,7 @@ def run_format_effect_robust(
     summary_df = pd.DataFrame(summary_rows)
     if not summary_df.empty:
         summary_df = summary_df.sort_values(["feature", "subset"])
-        summary_df.to_csv(table_path, index=False, encoding="utf-8-sig")
+        export_table_bundle(summary_df, table_path)
         plot_format_robust_forest(summary_df, picture_path)
 
     report_lines.append("")
@@ -539,3 +520,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

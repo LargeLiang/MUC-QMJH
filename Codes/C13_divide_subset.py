@@ -24,9 +24,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Dict
 
-from accessor import get_data_dir, get_data_path, get_output_dir
-
-# 四个分类字段的简写，便于后续枚举引用
+from accessor import get_dir, get_path, get_dir # 四个分类字段的简写，便于后续枚举引用
 _SHORT = ["cw", "if", "math", "code"]
 
 
@@ -180,19 +178,19 @@ def divide_data_by_category(file_path: Path | str | None = None,
 
     # 支持传入自定义文件路径，便于测试或在不同目录下运行脚本
     if file_path is None:
-        file_path = get_data_path("optimized")
+        file_path = get_path("optimized")
     else:
         file_path = Path(file_path)
 
     # 默认数据输出目录为当前工作目录下的 Data/subsets
     if data_dir is None:
-        data_dir = get_data_dir("subsets")
+        data_dir = get_dir("subsets")
     else:
         data_dir = Path(data_dir)
 
     # 默认报告输出目录为当前工作目录下的 Reports
     if report_dir is None:
-        report_dir = get_output_dir("report")
+        report_dir = get_dir("report")
     else:
         report_dir = Path(report_dir)
 
@@ -319,4 +317,6 @@ if __name__ == "__main__":
     print("\n" + "=" * 80)
     print("任务完成！")
     print("=" * 80)
+
+
 

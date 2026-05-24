@@ -16,7 +16,7 @@ import pandas as pd
 from pathlib import Path
 from collections import Counter
 
-from accessor import get_data_path, get_output_dir, load_parquet_or_none
+from accessor import get_path, get_dir, load_parquet_or_none
 
 
 def touch_session(file_path: Path | str | None = None, output_dir: Path | str | None = None) -> None:
@@ -35,13 +35,13 @@ def touch_session(file_path: Path | str | None = None, output_dir: Path | str | 
 
     # 支持传入自定义文件路径，便于测试或在不同目录下运行脚本
     if file_path is None:
-        file_path : Path = get_data_path("integrated")
+        file_path : Path = get_path("integrated")
     else:
         file_path : Path = Path(file_path)
 
     # 默认输出目录为当前工作目录下的 Reports
     if output_dir is None:
-        output_dir : Path = get_output_dir("report")
+        output_dir : Path = get_dir("report")
     else:
         output_dir : Path = Path(output_dir)
 
@@ -141,3 +141,4 @@ if __name__ == "__main__":
     print("=" * 80)
 
     touch_session()
+

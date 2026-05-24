@@ -1,6 +1,6 @@
 # 统计方法逻辑链条图
 
-> 用途：把 C14-C22 中真正进入结果解释的统计方法，按课题研究推进顺序压缩成一条从“现象识别”到“机制解释”的方法链。
+> 用途：把 C14-C23 中真正进入结果解释的统计方法，按课题研究推进顺序压缩成一条从“现象识别”到“机制解释”的方法链。
 > 适用场景：课堂展示、组会汇报、论文框架梳理、零基础读者快速建立全局地图。
 
 ---
@@ -18,14 +18,14 @@ flowchart TD
     D1 --> E1["C16 长度存在性检验\nM04 Wilcoxon\nM05 Bonferroni\nM06 Bootstrap CI\nM07 Rank-biserial r\nM08 Cohen's d / Hedges' g"]
     D2 --> E2["C17 格式存在性检验\nM03 文本格式密度\nM04 Wilcoxon\nM05 Bonferroni\nM06 Bootstrap CI\nM07 Rank-biserial r\nM08 Cohen's d / Hedges' g\nM09 卡方检验"]
 
-    E1 --> F["C18 净效应建模\nM10 z-score 标准化\nM11 逻辑回归\nM12 OR 与 95%CI\nM13 AME\nM14 Wald 部分相关 r\nM15 混淆比例"]
-    E2 --> F
+    E1 --> F1["C18 长度净效应\nM10 z-score 标准化\nM11 逻辑回归\nM12 OR 与 95%CI\nM13 AME\nM14 Wald 部分相关 r\nM15 混淆比例"]
+    E2 --> F2["C19 格式净效应\nM10 z-score 标准化\nM11 逻辑回归\nM12 OR 与 95%CI\nM13 AME\nM14 Wald 部分相关 r\nM15 混淆比例"]
 
-    F --> G1["C19 长度稳健性\nM16 倾向得分\nM17 IPW\nM18 ATE 与 ESS\nM11 逻辑回归\nM12 OR 与 95%CI"]
-    F --> G2["C20 格式稳健性\nM16 倾向得分\nM17 IPW\nM18 ATE 与 ESS\nM11 逻辑回归\nM12 OR 与 95%CI"]
-    G1 --> G3["C21 匹配诊断\nM19 PSM\nM20 SMD\nM04 匹配后 Wilcoxon"]
+    F1 --> G1["C20 长度稳健性\nM16 倾向得分\nM17 IPW\nM18 ATE 与 ESS\nM11 逻辑回归\nM12 OR 与 95%CI"]
+    F2 --> G2["C21 格式稳健性\nM16 倾向得分\nM17 IPW\nM18 ATE 与 ESS\nM11 逻辑回归\nM12 OR 与 95%CI"]
+    G1 --> G3["C22 匹配诊断\nM19 PSM\nM20 SMD\nM04 匹配后 Wilcoxon"]
 
-    G1 --> H["C22 机制解释\nM10 z-score 标准化\nM21 SEM\nM22 直接/间接/总效应\nM23 拟合指标\nM06 Bootstrap CI"]
+    G1 --> H["C23 机制解释\nM10 z-score 标准化\nM21 SEM\nM22 直接/间接/总效应\nM23 拟合指标\nM06 Bootstrap CI"]
     G2 --> H
     G3 --> H
 
@@ -63,7 +63,7 @@ flowchart TD
 - M04 Wilcoxon：既用于正式存在性检验，也用于匹配后的再验证。
 - M06 Bootstrap：既用于差异区间，也用于 IPW 和 SEM 的复杂效应区间。
 - M10 z-score 标准化：既服务于嵌套回归，也服务于 SEM。
-- M11-M12：既用于 C18 的净效应模型，也用于 C19-C20 的稳健性回归。
+- M11-M12：既用于 C18-C19 的净效应模型，也用于 C20-C21 的稳健性回归。
 
 这不是重复，而是说明这些方法在不同层次承担了不同任务。
 
@@ -75,9 +75,9 @@ flowchart TD
 | --- | --- | --- | --- |
 | 现象层 | C14-C15 | M01-M03 | 看清长度和格式现象大致长什么样 |
 | 存在性检验层 | C16-C17 | M04-M09 | 判断偏好是否系统存在 |
-| 净效应层 | C18 | M10-M15 | 控制混淆后还剩多少核心效应 |
-| 稳健性与可比性层 | C19-C21 | M16-M20 | 换估计框架后结论是否仍成立 |
-| 机制层 | C22 | M21-M23 | 解释变量通过哪些路径影响偏好 |
+| 净效应层 | C18-C19 | M10-M15 | 控制混淆后还剩多少核心效应 |
+| 稳健性与可比性层 | C20-C22 | M16-M20 | 换估计框架后结论是否仍成立 |
+| 机制层 | C23 | M21-M23 | 解释变量通过哪些路径影响偏好 |
 
 ---
 
@@ -88,7 +88,7 @@ flowchart TD
 1. 先看本文件，建立整条研究逻辑的全局地图。
 2. 再看 `introduction_index.md` 与 phase 1-5，理解每一阶段为什么要这样推进。
 3. 然后结合 `method_list.md`，按 M01-M23 顺序进入各方法入门文档。
-4. 最后回到 C14-C22 的脚本和结果文件，把“方法链”和“实际输出”对应起来。
+4. 最后回到 C14-C23 的脚本和结果文件，把“方法链”和“实际输出”对应起来。
 
 如果只想用一句话概括这条链，可以写成：
 

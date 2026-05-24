@@ -1,16 +1,16 @@
 """
-C21_enhanced_matching_diagnostics
+C22_enhanced_matching_diagnostics
 
 评估长度处理变量的匹配质量，并输出匹配后诊断结果。
 
 功能：
-- 复用 C19 的处理定义和倾向得分估计逻辑
+- 复用 C20 的处理定义和倾向得分估计逻辑
 - 计算匹配前后平衡性指标与匹配后 Wilcoxon 结果
 - 输出诊断表、总览图和文本报告
 
 数据流向：
     optimized_data.parquet 与 C13 子集 parquet → 倾向得分匹配与平衡性诊断 → Tables/T09_matching_summary.csv 与 Tables/T10_matching_balance.csv
-    + Reports/R19_enhanced_diagnostics_report.txt + Pictures/P12_matching_diagnostics_overview.png
+    + Reports/R20_enhanced_diagnostics_report.txt + Pictures/P12_matching_diagnostics_overview.png
 """
 
 from __future__ import annotations
@@ -24,30 +24,11 @@ import pandas as pd
 from scipy.stats import wilcoxon
 from sklearn.neighbors import NearestNeighbors
 
-from accessor import build_output_paths, get_analysis_subset_paths, get_output_path
-from C18_pure_effect import build_model_stats, load_data_global, load_subset
-from C19_length_effect_robust import active_confounders, fit_propensity_scores, prepare_subset_for_robustness
+from accessor import get_analysis_subset_paths, get_path, SUBSET_LABELS_EN
+from C18_pure_length_effect import build_model_stats, load_data_global, load_subset
+from C20_length_effect_robust import active_confounders, fit_propensity_scores, prepare_subset_for_robustness
+from table_export_utils import export_table_bundle
 
-
-SUBSET_LABELS_EN = {
-    "全量": "Full",
-    "无类别": "No category",
-    "仅创意写作": "CW only",
-    "仅指令遵循": "IF only",
-    "仅数学": "Math only",
-    "仅代码": "Code only",
-    "创意+指令": "CW + IF",
-    "创意+数学": "CW + Math",
-    "创意+代码": "CW + Code",
-    "指令+数学": "IF + Math",
-    "指令+代码": "IF + Code",
-    "数学+代码": "Math + Code",
-    "创意+指令+数学": "CW + IF + Math",
-    "创意+指令+代码": "CW + IF + Code",
-    "创意+数学+代码": "CW + Math + Code",
-    "指令+数学+代码": "IF + Math + Code",
-    "四类全含": "All four",
-}
 
 MATCHING_TABLE_FILES = {
     "summary": "T09_matching_summary.csv",
@@ -322,16 +303,15 @@ def run_matching_diagnostics(
     """执行完整的 R19 匹配诊断流程。"""
     root = Path.cwd()
     if report_dir is None:
-        report_path = get_output_path("report", "R19_enhanced_diagnostics_report.txt", root)
+        report_path = get_path("report", "R20_enhanced_diagnostics_report.txt", root)
     else:
-        report_path = Path(report_dir) / "R19_enhanced_diagnostics_report.txt"
+        report_path = Path(report_dir) / "R20_enhanced_diagnostics_report.txt"
 
     if table_dir is None:
-        table_paths = build_output_paths(
-            "table",
-            MATCHING_TABLE_FILES,
-            root,
-        )
+        table_paths = {
+            name: get_path("table", file_name, root)
+            for name, file_name in MATCHING_TABLE_FILES.items()
+        }
     else:
         table_root = Path(table_dir)
         table_paths = {
@@ -340,7 +320,7 @@ def run_matching_diagnostics(
         }
 
     if picture_dir is None:
-        picture_path = get_output_path("picture", MATCHING_PICTURE_FILE, root)
+        picture_path = get_path("picture", MATCHING_PICTURE_FILE, root)
     else:
         picture_path = Path(picture_dir) / MATCHING_PICTURE_FILE
 
@@ -388,9 +368,9 @@ def run_matching_diagnostics(
     balance_df = pd.DataFrame(all_balance_rows)
     if not summary_df.empty:
         summary_df = summary_df.sort_values("mean_abs_smd_after")
-        summary_df.to_csv(table_paths["summary"], index=False, encoding="utf-8-sig")
+        export_table_bundle(summary_df, table_paths["summary"])
     if not balance_df.empty:
-        balance_df.to_csv(table_paths["balance"], index=False, encoding="utf-8-sig")
+        export_table_bundle(balance_df, table_paths["balance"])
     if not summary_df.empty and not balance_df.empty:
         plot_matching_diagnostics(summary_df, balance_df, picture_path)
 
@@ -434,3 +414,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
