@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from scipy.stats import wilcoxon, chi2_contingency
+from scipy.stats import wilcoxon, binomtest
 from typing import Dict, List, Optional, Tuple
 
 from accessor import (
@@ -108,15 +108,15 @@ def _wilcoxon_one(arr: np.ndarray) -> Tuple[float, float, float]:
     """
     执行 Wilcoxon 检验，返回 (W, p_raw, r_rb)。
 
-    scipy wilcoxon(alternative='greater') 返回负秩和 W⁻，
-    故 r_rb = 1 - 2W⁻/(n*(n+1))。
+    scipy wilcoxon(alternative='greater') 返回正秩和 W+，
+    故 r_rb = 4W+/(n*(n+1)) - 1。
     """
     nonzero = arr[arr != 0]
     if len(nonzero) == 0:
         return np.nan, np.nan, np.nan
     stat, p = wilcoxon(nonzero, alternative="greater", zero_method="wilcox")
     n = len(nonzero)
-    r_rb = float(1 - 2 * stat / (n * (n + 1)))
+    r_rb = float(4 * stat / (n * (n + 1)) - 1)
     return float(stat), float(p), r_rb
 
 
@@ -140,7 +140,7 @@ def _cohens_d(arr: np.ndarray) -> Tuple[float, float]:
 
 
 def _chisquare_presence(df: pd.DataFrame, feature: str) -> Optional[float]:
-    """对"胜者有格式 vs 败者有格式"构造列联表并执行卡方检验，返回 p 值。"""
+    """兼容旧函数名；对不一致配对执行精确双侧 McNemar 检验。"""
     a_col = f"a_{feature}_count"
     b_col = f"b_{feature}_count"
     a_cnt = df[a_col].apply(safe_int_count)
@@ -148,15 +148,9 @@ def _chisquare_presence(df: pd.DataFrame, feature: str) -> Optional[float]:
     winner_is_a = (df["winner"] == "model_a").values
     win_has = np.where(winner_is_a, a_cnt > 0, b_cnt > 0).astype(int)
     los_has = np.where(winner_is_a, b_cnt > 0, a_cnt > 0).astype(int)
-    ct = pd.crosstab(pd.Series(los_has, name="loser_has"),
-                     pd.Series(win_has, name="winner_has"))
-    if ct.shape != (2, 2):
-        return None
-    try:
-        _, p, _, _ = chi2_contingency(ct)
-        return float(p)
-    except Exception:
-        return None
+    discordant = win_has != los_has
+    n = int(discordant.sum())
+    return float(binomtest(int(((win_has == 1) & discordant).sum()), n).pvalue) if n else 1.0
 
 
 def run_one_subset(label: str, df: pd.DataFrame) -> Optional[Dict]:
@@ -412,7 +406,7 @@ def generate_report(all_results: List[Dict], report_dir: Path) -> None:
         f.write("  排除 winner∈{tie, both_bad}\n")
         f.write(f"  多重比较：子集内 Bonferroni（k={BONFERRONI_K} 个格式特征）\n")
         f.write("  辅助：格式密度差值 Wilcoxon（Δ_density，不纳入校正）\n")
-        f.write("  效应量：rank-biserial r = 1 - 2W⁻/(n*(n+1))\n")
+        f.write("  效应量：rank-biserial r = 4W+/(n*(n+1)) - 1\n")
         f.write(f"  Bootstrap CI：{N_BOOTSTRAP} 次重采样（百分位法，seed=42）\n\n")
 
         f.write("【格式密度定义】\n")
@@ -498,6 +492,8 @@ def generate_report(all_results: List[Dict], report_dir: Path) -> None:
 
 
 if __name__ == "__main__":
+    from legacy_guard import require_legacy_opt_in
+    require_legacy_opt_in(__file__)
     print("=" * 80)
     print("C17  格式偏好统计检验（Wilcoxon + 密度辅助 + 卡方存在性）")
     print("=" * 80 + "\n")

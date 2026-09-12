@@ -350,6 +350,8 @@ def generate_token_report(file_path: Path,
 
 
 if __name__ == "__main__":
+    from legacy_guard import require_legacy_opt_in
+    require_legacy_opt_in(__file__)
     print("=" * 80)
     print("分析 token 相关字段")
     print("=" * 80)

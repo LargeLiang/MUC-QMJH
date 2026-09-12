@@ -419,6 +419,8 @@ def generate_analysis_report(diff_bin_stats: pd.DataFrame,
 
 
 if __name__ == "__main__":
+    from legacy_guard import require_legacy_opt_in
+    require_legacy_opt_in(__file__)
     print("=" * 80)
     print("长度偏好可视化分析")
     print("=" * 80)

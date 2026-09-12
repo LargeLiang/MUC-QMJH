@@ -85,6 +85,8 @@ def verify_order_consistency(file_path: Path | str | None = None) -> None:
         print("  结论: 未发现明显的 order 缺失或重复，session 记录数与 order 关系一致。")
 
 if __name__ == "__main__":
+    from legacy_guard import require_legacy_opt_in
+    require_legacy_opt_in(__file__)
     print("=" * 80)
     print("验证原数据的会话顺序完整性")
     print("=" * 80)

@@ -105,6 +105,8 @@ def verify_session_integrity(root: Path | str | None = None) -> None:
         print("  说明: 数据分片上的会话完整，可按文件逐一分析。")
     
 if __name__ == "__main__":
+    from legacy_guard import require_legacy_opt_in
+    require_legacy_opt_in(__file__)
     print("=" * 80)
     print("验证数据分割后的会话完整性")
 

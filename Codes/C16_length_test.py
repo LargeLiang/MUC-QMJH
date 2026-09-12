@@ -149,9 +149,9 @@ def run_one_subset(label: str, df: pd.DataFrame) -> Optional[Dict]:
 
     # Rank-biserial 相关系数
     # scipy wilcoxon(alternative='greater') 返回负秩和 W⁻
-    # 公式：r_rb = 1 - 2W⁻ / (n*(n+1))，此时 r_rb > 0 表示正向效应
+    # 单侧 SciPy 返回 W+；r_rb = 4W+ / (n*(n+1)) - 1。
     if n_nonzero > 0:
-        r_rb = float(1 - 2 * stat / (n_nonzero * (n_nonzero + 1)))
+        r_rb = float(4 * stat / (n_nonzero * (n_nonzero + 1)) - 1)
     else:
         r_rb = 0.0
 
@@ -441,6 +441,8 @@ def generate_report(results: List[Dict], k: int, report_dir: Path) -> None:
 # 入口
 
 if __name__ == "__main__":
+    from legacy_guard import require_legacy_opt_in
+    require_legacy_opt_in(__file__)
     print("=" * 80)
     print("C16  长度偏好统计检验（Wilcoxon 符号秩 + Bonferroni + rank-biserial r）")
     print("=" * 80 + "\n")

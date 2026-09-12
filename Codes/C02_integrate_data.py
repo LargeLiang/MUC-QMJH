@@ -175,6 +175,8 @@ def integrate_original_data(file_paths: Iterable[Path] | None = None, output_dir
     print(f"已成功处理文件数: {processed_files}/{total_files}")
 
 if __name__ == "__main__":
+    from legacy_guard import require_legacy_opt_in
+    require_legacy_opt_in(__file__)
     print("=" * 80)
     print("整合各个parquet文件")
 

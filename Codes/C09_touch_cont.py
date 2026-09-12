@@ -239,6 +239,8 @@ def write_counter_section(f, counter: Counter, label: str, top_n: int = 5) -> No
 
 
 if __name__ == "__main__":
+    from legacy_guard import require_legacy_opt_in
+    require_legacy_opt_in(__file__)
     print("=" * 80)
     print("分析 content 字段")
     print("=" * 80)

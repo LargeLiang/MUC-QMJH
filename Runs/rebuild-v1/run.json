@@ -1,0 +1,16 @@
+{
+  "started": "2026-09-12T08:35:57.902960+00:00",
+  "python": "3.13.5 (tags/v3.13.5:6cb20a2, Jun 11 2025, 16:15:46) [MSC v.1943 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "code_sha256": "635705b91ab884e12faf1c792fb889dab48d4c327881d0a3874c2be09b360062",
+  "packages": {
+    "numpy": "2.3.5",
+    "pandas": "2.3.3",
+    "pyarrow": "21.0.0",
+    "scipy": "1.16.1",
+    "statsmodels": "0.14.6"
+  },
+  "status": "failed",
+  "error": "ValueError('Expected one retained first evaluation per nonmissing session')",
+  "finished": "2026-09-12T08:36:18.483847+00:00"
+}

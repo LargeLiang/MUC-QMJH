@@ -851,4 +851,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    from legacy_guard import require_legacy_opt_in
+    require_legacy_opt_in(__file__)
     main()

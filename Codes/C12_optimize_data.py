@@ -22,7 +22,10 @@ from tqdm import tqdm
 from typing import Dict, Tuple
 from collections import Counter
 
-from accessor import get_dir, get_path, get_dir def check_qualification(row) -> Tuple[bool, str]:
+from accessor import get_dir, get_path
+
+
+def check_qualification(row) -> Tuple[bool, str]:
     """
     检查单行数据是否符合优化条件。
 
@@ -40,7 +43,7 @@ from accessor import get_dir, get_path, get_dir def check_qualification(row) -> 
     """
     
     # 1. 检查 evaluation_order：只保留第一轮评价
-    if row.get("evaluation_order", -1) > 1:
+    if row.get("evaluation_order", -1) != 1:
         return False, "evaluation_order > 1（非首轮评价，包含Session历史）"
 
     # 2. 检查 conversation_a 的 content 是否为空
@@ -490,6 +493,8 @@ def generate_optimization_report(file_path: Path, stats: Dict,
 
 
 if __name__ == "__main__":
+    from legacy_guard import require_legacy_opt_in
+    require_legacy_opt_in(__file__)
     print("=" * 80)
     print("优化和清洗原始整合数据")
     print("=" * 80)

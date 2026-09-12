@@ -1,8 +1,9 @@
 cff-version: 1.2.0
 message: >-
-  If you use this repository, its scripts, or its self-authored documentation in
-  research, teaching, or derived software, please cite the repository.
-title: MUC-QMJH Human Preference Bias Analysis Repository
+  Cite the repository and identify the exact analysis run and source hash.
+  Version 1.5 below identifies the historical release; current working-tree
+  association analyses are not a newly published release.
+title: MUC-QMJH Human Preference Analysis Repository
 type: software
 version: "1.5"
 date-released: 2026-04-15
@@ -12,12 +13,11 @@ authors:
     given-names: MUC-QMJH
     affiliation: Minzu University of China
 abstract: >-
-  Research repository for analyzing human preference biases in LLM outputs,
-  with a focus on length preference, format preference, confounding control,
-  robustness checks, matching diagnostics, and SEM-based mechanism analysis.
+  Research repository for observational associations between response length,
+  formatting features and human pairwise preferences. Current analysis identity
+  is recorded in CURRENT_RESULTS.json. Historical matching and SEM estimates
+  are retained for audit and are not current inferential evidence.
 keywords:
   - LLM preference
-  - RLHF
-  - data analysis
-  - robustness analysis
-  - SEM
+  - observational associations
+  - reproducibility
