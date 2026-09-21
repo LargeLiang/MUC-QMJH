@@ -1,0 +1,14 @@
+{
+  "run": "integrated-20260920",
+  "source": "Data\\analysis_data\\integrated-20260920\\analysis_data.parquet",
+  "source_sha256": "5fca574616ff8c4f1562e4582175d5d8a9471adaefc9aee95bed8dbfc8c05b49",
+  "thresholds": [
+    1.25,
+    2
+  ],
+  "scope": "Post-hoc descriptive audit illustration; not an efficiency validation.",
+  "counts": {
+    "retained": 108154,
+    "decisive": 78959
+  }
+}

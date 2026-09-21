@@ -1,0 +1,4 @@
+,header_density_diff,list_density_diff,bold_density_diff
+header_density_diff,1.0,0.09783707459298412,0.1683613930799474
+list_density_diff,0.09783707459298412,1.0,0.20657009176897306
+bold_density_diff,0.1683613930799474,0.20657009176897306,1.0

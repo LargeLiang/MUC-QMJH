@@ -1,0 +1,60 @@
+{
+  "status": "complete",
+  "source": "Data\\analysis_data\\integrated-20260920\\analysis_data.parquet",
+  "source_sha256": "5fca574616ff8c4f1562e4582175d5d8a9471adaefc9aee95bed8dbfc8c05b49",
+  "script_sha256": "d24acd914ed19c359f1ac04dd9192f889b3eb35fbf8cc0052b6fb0f1ee4025cd",
+  "seed": 20260921,
+  "normal_simulation_draws": 50000,
+  "method": "OLS + logit; cross-equation HC0; joint-normal Monte Carlo product intervals, not bootstrap",
+  "versions": {
+    "python": "3.13.5",
+    "numpy": "2.3.5",
+    "pandas": "2.3.3",
+    "scipy": "1.16.1",
+    "statsmodels": "0.14.6"
+  },
+  "diagnostics": [
+    {
+      "subset": "full",
+      "n": 78959,
+      "design_rank": 90,
+      "reference_model": "amazon-nova-experimental-chat-05-14",
+      "converged": true,
+      "outcome_matches_frozen": true
+    },
+    {
+      "subset": "english",
+      "n": 42001,
+      "design_rank": 69,
+      "reference_model": "amazon-nova-experimental-chat-05-14",
+      "converged": true,
+      "outcome_matches_frozen": true
+    },
+    {
+      "subset": "single_turn",
+      "n": 67608,
+      "design_rank": 89,
+      "reference_model": "amazon-nova-experimental-chat-05-14",
+      "converged": true,
+      "outcome_matches_frozen": true
+    }
+  ],
+  "independence": "pairs; no user/prompt clustering",
+  "scaling": "fixed sample means and population SDs; intervals conditional on this scaling",
+  "artifacts": {
+    "all_terms_english.csv": "b004f9fc4a210a57ffb7e3fb55cbb3c8a38986189e79a3ff0bfa56792031bc5e",
+    "all_terms_full.csv": "03a58068d04903befbe1b90d663c45122982c9c27709f5c3665fca230df8d1b2",
+    "all_terms_single_turn.csv": "9f98bef0d00cd88829f6ffb87bbd430432fb3e6ebfc5173d8d9ed9f3bc6d9dd0",
+    "format_residual_correlations_english.csv": "5a3eb4697665259ad1154f0087ecdf9da5b2bf41ab433307b2f0283b686a3b92",
+    "format_residual_correlations_full.csv": "8189928fe63f1f5741bdc3e2064219819b3b49fa0fa095d8d82c530ab35b579c",
+    "format_residual_correlations_single_turn.csv": "d979782778fa495cfca9684a393e32c25765b7cb094f005d4f14b88537838ea9",
+    "joint_covariance_english.csv": "9fa7df6c61ff1356cc0e5df4adc0827605c2663d639b3210d692d01d90c09c4d",
+    "joint_covariance_full.csv": "241a8169f23081eaa7a25095ee09ecf51fde6b68dcbc97e65b169f632a79e17f",
+    "joint_covariance_single_turn.csv": "d41f0e3ce138fb4516f0470160a8c843585ccf001062832d4d381bdaf7d1f16e",
+    "path_products.csv": "be4a1de9d9624eeed84a2ed7e81ef898b75be3b0fc63fad7a5a5abbbb5d3f7c8",
+    "paths.csv": "32100698926f0e490292d1cc9c977a5436a63b3644be41a5fefe0c71f59692dd",
+    "scaling_english.csv": "65c2cfe0b493535cbdf80abb32b902d2201488f0d7f05194bc73d472b059f226",
+    "scaling_full.csv": "2a42098b697deaffc1f954cc6d4a62c1d0b2836ed7392fc9a36636151466ec89",
+    "scaling_single_turn.csv": "a9ce6b3f9e806f5588d61aa3b9079eb0f3bd974f7d5e68c60114ae816c096ab0"
+  }
+}

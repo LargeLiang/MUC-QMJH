@@ -1,0 +1,56 @@
+\section{成对比较模型与推断方法}
+\subsection{描述性配对比较}
+以胜者减败者的差值描述方向，报告非零差配对中正差比例、零差数及秩二列相关。符号检验及格式存在性的精确McNemar检验沿用冻结分析；全量、英语、单轮及任务组合的比较采用同一Holm家族校正\cite{holm}。这些描述检验以配对独立为工作假设，仅作背景，不替代下文的聚类回归推断。补充Wilcoxon结果不作无条件的中位数检验解释。
+
+\subsection{含模型身份对比项的Logistic模型}
+对明确胜负样本，令$p_i=\Pr(Y_i=1\mid\bm z_i,\bm X_i,m_{Ai},m_{Bi})$，拟合
+\begin{equation}\label{eq:logit}
+ \log\frac{p_i}{1-p_i}=\alpha+\beta_Lz_{Li}+\beta_Hz_{Hi}
+ +\beta_Bz_{Bi}+\beta_Sz_{Si}+\bm\gamma^\top\bm X_i
+ +\theta_{m_{Ai}}-\theta_{m_{Bi}}.
+\end{equation}
+模型身份参数差沿用Bradley--Terry型结构\cite{bradley,firth}，通过指定参考模型识别。本文称其为含模型身份对比项的成对比较Logistic模型，区别于匹配病例的条件Logistic回归。共有任务变量及截距允许A侧优势随背景变化，不将模型宣称为严格交换对称的纯排名模型。参数通过最大化Bernoulli对数似然估计：
+\begin{equation}
+ \ell(\bm\eta)=\sum_i\{Y_i\bm v_i^\top\bm\eta-\log[1+\exp(\bm v_i^\top\bm\eta)]\}.
+\end{equation}
+检查比较图连通性、设计矩阵秩、收敛与参数有限性，并以替换参考模型核验焦点系数和预测概率不变。连通和收敛不等于模型设定正确；数值诊断也不替代完全分离的形式化证明。
+
+\subsection{聚类协方差与多重比较}
+提示词分组先统一Unicode NFC及换行符，再对消息序列计算哈希；保留空格和代码缩进，不作语义近似去重。主要推断按首条用户消息聚类，完整用户消息序列及无序模型对聚类作为另外两种敏感性方案。三种聚类分别计算，未进行多向聚类；它们均不能替代缺失的用户标识。
+
+设组$g$的得分和为$\bm s_g=\sum_{i\in g}\bm v_i(Y_i-\widehat p_i)$，$B=\sum_i\widehat p_i(1-\widehat p_i)\bm v_i\bm v_i^\top$，聚类协方差为\cite{cameron}
+\begin{equation}
+ \widehat V_{\mathrm{cl}}=\frac{G}{G-1}\frac{n-1}{n-K}
+ B^{-1}\left(\sum_{g=1}^G\bm s_g\bm s_g^\top\right)B^{-1},
+\end{equation}
+其中$G$为簇数，$K$为参数数目。系数区间和双侧检验采用$t_{G-1}$近似；HC0使用正态近似作为对照。组内可相关而组间独立仍是工作假设。簇规模不均衡及模型对间共享同一模型的相关性可能影响近似，不能将任一方案视为全面消除依赖。
+
+主分析在全量、英语、单轮三个模型的12个焦点系数间实施Holm校正，各协方差方案分别构成一族。月份、替代解析、格式存在性和截尾四种补充模型的16个系数构成另一族；明确胜负状态模型的4项构成独立家族。95\%区间均为逐项区间。优势比$\exp(\beta_k)$对应全量明确胜负样本一个标准差，不能解释为编辑文本后的因果收益。格式存在性模型另用该二元差值的全量标准差，不能与密度OR直接比较。
+
+\subsection{非线性及其他敏感性设定}
+长度项使用四节点限制性三次样条\cite{harrell}，节点规则在拟合前固定为全量长度指标的5\%、35\%、65\%、95\%分位数；保留线性项并增加两个非线性基函数。对两个非线性系数联合检验，聚类方案采用$F_{2,G-1}$近似。AIC只作为条件独立似然下的辅助描述。
+
+预测曲线将有方向长度比$r=L_A/L_B$固定在给定值，对观察样本其余协变量分布平均：
+\begin{equation}
+ \widehat P(r)=\frac1n\sum_i\operatorname{logit}^{-1}
+ \{\widehat\eta_i+\widehat f(z_L(r))-\widehat f(z_{Li})\}.
+\end{equation}
+区间采用首提示词聚类协方差与Delta法，为逐点区间。曲线保留格式密度不变，只表示模型标准化预测关联；固定密度而改变长度隐含计数变化，不能理解为保持回答其余内容不变的长度干预。
+
+其他检查分别加入月份固定效应、用AST重解析计数替换上游格式计数、改用格式有无差，以及排除长度对数比两端各1\%的配对。替代计数使用原密度尺度以便解释，存在性模型单独标准化。敏感性设定一次改变一个方面，没有依据显著性筛选变量。月份主效应不代表控制了所有模型随时间变化的异质性。
+
+\subsection{明确胜负与未决状态}
+令$D_i=1$表示明确胜负，平局和双方差对应$D_i=0$。全部保留记录上拟合
+\begin{equation}
+ \operatorname{logit}\Pr(D_i=1)=\alpha_D+\delta_Lw_{Li}
+ +\sum_f\delta_fw_{fi}+\bm\gamma_D^\top\bm X_i
+ +\phi_{m_{Ai}}+\phi_{m_{Bi}}+\lambda_{t_i},
+\end{equation}
+其中$w$为长度对数比及格式密度差绝对值在全部保留样本中的标准化量，$\lambda_{t_i}$为月份项；模型身份以加和而非差分编码，使方程在A/B交换后不变。此方程描述是否形成明确选择，与条件胜负模型共同区分两个研究对象。虽然$\Pr(\text{A胜})=\Pr(D=1)\Pr(\text{A胜}\mid D=1)$，增加状态方程并不能自动纠正未观测混杂或样本选择偏差。平局和双方差仍分别报告，不把二者解释为同一种评价。
+
+\subsection{审计分层}
+定义无方向长度比
+\begin{equation}\label{eq:ratio}
+ R_i=\frac{\max(L_{Ai},L_{Bi})}{\min(L_{Ai},L_{Bi})},
+\end{equation}
+按$R\leq1.25$、$1.25<R\leq2$、$R>2$形成三个复核层，并保留各层全部评价状态。阈值为事后解释性规则，未证明最优；关联强弱只提示复核方向，不判定标签错误。第6节区分层间比较与总体争议率估计，给出相应预算分配。

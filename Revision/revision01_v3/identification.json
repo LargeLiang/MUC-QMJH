@@ -1,0 +1,16 @@
+{
+  "models": 52,
+  "connected_components": [
+    52
+  ],
+  "design_rank": 90,
+  "reference_invariance_passed": true,
+  "model_pairs": 1201,
+  "pairs_under20": 173,
+  "one_outcome_pairs": 11,
+  "converged": true,
+  "separation_warning": false,
+  "formal_separation_lp_test": false,
+  "min_predicted": 0.021294806564363156,
+  "max_predicted": 0.9727030546601787
+}

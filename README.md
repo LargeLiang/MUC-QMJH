@@ -50,7 +50,7 @@ python Codes/C00_run_all.py --run-id my-new-run --compare-legacy Legacy/Runs/fin
 
 不要复用已有运行编号。对照基线属于可选迁移验收，不是新流程运行依赖。缺少本地原始/派生数据时，可使用 `python Codes/C05_verify_results.py --public-only` 仅校验公开产物；这不等于完整复现。
 
-详见 [复现说明](REPRODUCIBILITY.md)、[新旧对应](UNIFICATION.md)、[当前结果摘要](RESULTS_REBUILT.md) 和 [迁移记录](MIGRATION.md)。
+详见 [新工程运行流程、设计逻辑与功能详解](PROJECT_GUIDE.md)、[复现说明](REPRODUCIBILITY.md)、[新旧对应](UNIFICATION.md)、[当前结果摘要](RESULTS_REBUILT.md) 和 [迁移记录](MIGRATION.md)。
 
 ## 研究边界
 

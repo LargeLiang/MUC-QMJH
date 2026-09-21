@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ':*)",
+      "Read(//tmp/**)",
+      "Bash(command -v pdftotext)",
+      "Bash(pdfinfo \"E:/Files/Repository/MUC-QMJH/Legacy/References/Papers/Chinese/因果推断视角下自然语言处理任务中的虚假相关性研究_韩明月.pdf\")",
+      "Bash(PYTHONIOENCODING=utf-8 python:*)",
+      "Bash(pdfinfo \"C:/Users/large/AppData/Local/Temp/papers_txt/HMY_causal_decrypted.pdf\")",
+      "Bash(command -v qpdf)",
+      "Bash(pdftoppm -png -r 140 -f 1 -l 10 \"HMY_causal_decrypted.pdf\" hmy)",
+      "Bash(ls -la hmy*.png)",
+      "Bash(tesseract --version)",
+      "Bash(tesseract --list-langs)",
+      "Bash(pdftoppm -png -r 300 -f 1 -l 16 \"HMY_causal_decrypted.pdf\" hd)",
+      "Bash(ls /tmp/papers_txt/c0*.png)"
+    ]
+  }
+}
