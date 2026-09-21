@@ -3,4 +3,4 @@
 
 # Historical notebook/SEM/plot tools are NOT required by the current chain.
 # Their previous dependency list is preserved in:
-# Archive/pre-unification-20260912/requirements.txt
+# Legacy/Archive/pre-unification-20260912/requirements.txt

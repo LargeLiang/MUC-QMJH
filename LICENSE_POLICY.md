@@ -9,7 +9,7 @@
 默认适用范围包括：
 
 - Codes/
-- check_nb.py
+- Legacy/check_nb.py
 - 未来新增的自研 Python、R、Shell、Notebook 调度代码
 
 Apache-2.0 适合作为科研代码仓库的默认许可，原因是：
@@ -25,7 +25,7 @@ Apache-2.0 适合作为科研代码仓库的默认许可，原因是：
 默认适用范围包括：
 
 - README.md
-- References/
+- Legacy/References/
 - CHANGELOG.md
 - CONTRIBUTING.md
 - SECURITY.md
@@ -45,7 +45,7 @@ Apache-2.0 适合作为科研代码仓库的默认许可，原因是：
 
 ## 4. 数据文件边界
 
-Data/ 下的原始数据、缓存数据、派生数据和任何可回溯至第三方数据集的文件，不受根目录 LICENSE 的统一授权。
+Data/ 与 Legacy/Data/、Legacy/Runs/ 中的原始数据、缓存数据、派生数据和任何可回溯至第三方数据集的文件，不受根目录 LICENSE 的统一授权。迁移不改变原许可边界。
 
 应遵循以下规则：
 

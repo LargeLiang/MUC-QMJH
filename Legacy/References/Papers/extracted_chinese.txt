@@ -1,0 +1,1194 @@
+=== 因果推断视角下自然语言处理任务中的虚假相关性研究_韩明月.pdf ===
+学校代码：10272
+学 号：2019311070
+SHANGHAI UNIVERSITY OF FINANCE AND ECONOMICS
+博 士 学 位 论 文
+DOCTORAL DISSERTATION
+因果推断视角下自然语言处理任务中的虚
+假相关性研究
+论文作者 韩明月
+院（系所） 信息管理与工程学院
+专 业 金融信息工程
+指导教师 王英林 教授
+完成日期 2023 年 5 月
+摘要
+因果推断视角下自然语言处理任务中的虚假相关性
+摘要
+现有机器学习的核心思想是寻找输入特征与输出结果的相关性，以建立两
+者间的映射关系。机器学习以训练样本数据与实际应用场景数据独立同分布为
+基本假设，从训练过程中寻找输入数据中对预测目标有帮助的线索（输入数据的
+特征），以实现模型在测试集上的效果提升。然而，在真实场景下这种独立同分
+布的假设并不成立，因此，模型往往会在分布外数据集上产生诸多预测错误。借
+鉴因果推断工具来分析模型分布外泛化能力差的现象，可以为设计自然语言处
+理任务的稳健性学习方法提供新的视角。由于混杂因子的存在（比如：数据选择
+偏好），训练数据集中的某些特征与预测目标的相关性往往是被错估的，当数据
+选择偏好改变时，这类特征与目标之间的相关性也会发生变化，呈现出不稳定性，
+因此被称为虚假相关性特征。基于虚假相关性特征的机器学习模型稳健性能差、
+可信性不足，难以被金融、医疗等高风险领域的关键应用场景所接受。此外，当
+模型所学到的虚假相关性特征（线索）与人类身份属性有关时，模型则有可能会
+传播乃至放大现实生活中的“偏见”，存在一定的负面社会性影响。
+本文在综合分析已有文献的基础上，借鉴因果推断理论，从因果图角度来刻
+画数据生成过程，分别从发现和缓解自然语言处理任务中的虚假相关性两个方
+面展开研究工作。主要研究内容和创新性工作如下：
+（1）常识因果推理任务中的虚假线索探索与分析。为揭示深度学习方法拟
+合数据中的虚假相关性这一现象，本文选取常识因果推理任务（COPA 任务）作
+为研究对象，观察基于预训练语言模型微调的常识因果推理系统的脆弱性程度。
+不同于以往使用可统计线索对常识因果推理模型脆弱性的研究方法，本文探索
+并发现了在该任务上存在的一个抽象虚假相关性线索：语义相似性。该线索在文
+本中并未显式呈现，因此不易被发现。通过设置两种干扰实验（前提干扰和问题
+类型掩盖）测试了基于知识库和基于预训练微调的常识因果推理模型的表现，验
+证了预训练语言模型对语义相似性的过度依赖假设，并对先前工作中的去偏模
+型进行测试，实验结果表明针对特定线索制定的缓解方案在新的对抗测试集中
+所展现出的脆弱程度可能会更严重。
+摘要
+（2）针对常识因果推理模型中存在的语义相似性虚假线索，提出了基于反
+事实约束的去偏方法。现有对常识因果推理模型的去偏方法是针对词分布线索
+设计的，这种方法可能导致模型加强对其它浅层线索的依赖。此外，目前对常识
+因果推理模型脆弱性的评估仅针对词线索而设计，对模型推理能力的脆弱性评
+估不够全面。为此，本文提出了基于反事实约束的改进方案，在原有训练损失的
+基础上增加了一个反事实惩罚项，该方案降低了模型对语义相似的依赖程度，并
+且改进的模型在保持原有预测水平的基础上，在针对词分布线索的对抗测试集
+上表现也更加稳健；此外，本文设计并构建了一个既可以评估模型对词分布依赖
+程度，又可以评估模型是否依赖语义相似线索的挑战测试集 BCOPA-CE，为衡量
+模型在该任务上的稳健性能提供了有效标准。
+（3）针对歧视言论检测模型中存在的与身份属性相关的虚假线索，提出了
+基于身份核心型样本过滤策略的公平性方案。针对歧视言论检测任务中的非预
+期偏见问题，主流去偏方法的目标是使得模型学习到的表示向量与身份信息尽
+可能无关。然而，与群体刻板印象相关的歧视言论样本，其核心情感由身份属性
+词表现出来，上下文本身无明显情感贡献。对这种类型样本去偏会使模型对歧视
+言论的捕捉能力变弱，在此类样本的对抗样本上呈现出过高的误判率。为此，本
+文提出身份核心型样本过滤机制，借鉴因果推断领域中的条件因果效应概念来
+刻画样本中的身份信息是否属于核心情感贡献词，在不同的去偏方法上实施该
+过滤策略，实验结果表明改进后的模型在保证 IID 预测能力和去偏能力的同时，
+提高了模型在身份核心型样本下的识别准确率。
+（4）针对未知虚假线索情况下分布外泛化能力较差的难题，提出了一种基
+于因果干预的模型稳健性增强方案。在许多任务场景下，虚假线索往往是未知的，
+此时设计能捕捉到因果特征的模型尤为重要。现有研究通过反事实增强和域泛
+化的方式来实现模型对因果特征的学习，但仍面临反事实生成质量不高、多领域
+的数据要求难以满足等挑战。本文针对未知虚假线索情况下的情感分类任务，提
+出了一种模型稳健性增强方法。该方法在没有域标签情况下，将文本主题作为混
+杂因子，从微观的域（不同主题）出发，建立因果图假设，基于后门调整技术对
+干预概率进行建模，捕获输入文本的潜在语义特征到目标变量之间的因果相关
+性，缓解模型对未知虚假线索的依赖。将所提方法分别在因果词扰动攻击型对抗
+样本（电影评论文本）和同义词扰动攻击型对抗样本（金融新闻文本）两个公开
+数据集上进行了实验，结果表明该方法能够提升情感分类模型的稳健性能，尤其
+摘要
+是长文本分类任务。
+综上所述，本文以因果推断为视角，对基于深度学习方法所建立的自然语言
+处理模型所面临的虚假相关性问题进行了较为深入的创新性研究和探索，尝试
+从已知虚假线索和未知虚假线索的角度对虚假相关性提供去偏方法，为提高自
+然语言处理模型的分布外泛化性能提供了有效途径。
+关键词： 自然语言处理，虚假相关，因果推断，分布外泛化，算法公平，
+稳健性
+Abstract
+Spurious Correlation in Natural Language
+Processing Tasks from the Perspective of Causal
+Inference
+Abstract
+The core of the existing machine learning models is correlation-based learning,
+which is effective under the assumption of independent and identical distribution (IID).
+The algorithms recklessly absorbing all the correlations found in training data, which
+can improve the performance on the IID test set, is statistically correct. However, the
+assumption of IID is usually violated in real life. Utilizing the causal inference tools to
+analyze the poor generalization ability of the models in the out-of-distribution (OOD)
+setting can provide a new perspective for designing robust methods for natural
+language processing tasks. Due to the existence of the confounder, some features
+utilized by the models are likely to have an unreasonable correlation with the target, so
+they present an unstable prediction if the dataset shifts, which is also known as spurious
+correlation. The correlation between the clues that are helpful for the prediction in the
+IID setting and the target may change greatly under the new distribution. Therefore, the
+model often shows a significant drop on the performance on the OOD test set, which
+hinders the application and promotion of the model in real life, especially in high-risk
+domains, such as in the fields of finance and medicine. In addition, when the clues
+exploited by the model are related to the demographic identity attributes, the model
+may spread or even amplify the "bias" in real life, which has negative social impacts.
+This paper explains the data generation process and elaborates on the possible
+changes in the correlation between the features and the target in data from the
+perspective of the causal graphs. The research on spurious correlation in natural
+language processing tasks from the two steps of investigation and mitigation. The main
+contents of this paper are as follows:
+(1) The exploration and analysis of the spurious cues in the commonsense causal
+reasoning tasks.
+To reveal the phenomenon in which deep learning methods might capture the
+spurious correlation in the training data, this paper selects the commonsense causal
+Abstract
+reasoning task (COPA task) as the research object to observe the vulnerability of the
+pre-trained language models (PLMs). Different from the previous work that used
+statistical clues to investigate the vulnerability of a commonsense causal reasoning
+model, this paper explores an abstract spurious clue in this task, semantic similarity.
+This clue is not explicitly presented in the text, which is not easy to identify. By
+conducting two different perturbation experiments—premise perturbation and question
+type masking, this paper evaluates the vulnerability of both the knowledge-based
+models and fine-tuned pre-trained language models. The experimental result verifies
+the assumption of over-dependence of the PLMs on semantic similarity. This paper also
+evaluates the de-biased model proposed in previous work, which focuses on token
+distribution. The experimental result shows that the mitigation solution developed for
+some specific clue might be more vulnerable in the new adversarial test set which is
+designed against another clue.
+(2) The counterfactual constraint method for reducing the semantic similarity bias
+in the commonsense reasoning models
+The current de-biased methods for the commonsense causal reasoning task are
+designed to address unbalanced token distribution, which may inadvertently increase
+the model’s dependence on another spurious clue. Moreover, the current vulnerability
+evaluation of commonsense causal reasoning models focuses on the token distribution
+only, which is not comprehensive enough. Therefore, this paper proposes an improved
+method based on the counterfactual constraint. This method introduces a penalty to
+reduce the dependence of the model on semantic similarity. The proposed model
+defenses the model from the semantic similarity attacking and is also more robust on
+the COPA-test-hard set, which has unbiased token distribution. Additionally, this paper
+introduces a challenging test set called BCOPA-CE, which can evaluate the ability of a
+system to distinguish the cause and effect and to choose cause or effect under unbiased
+token distribution.
+(3) The identity-cored samples filtering strategy for the fairness problem in the
+discrimination text classification
+For the fairness problem in the discrimination text detection, the goal of the existing
+debiasing methods is to make the representations of the input sentences as independent
+
+
+=== 基于数据分布的深度学习对抗鲁棒性研究.pdf ===
+Ｕ ｎ ｉ ｖｅｒｓｉｔｙ ｏｆ  Ｓｃｉｅｎｃｅａｎｄ  Ｔｅｃｈｎｏ ｌ ｏ ｇｙ ｏｆ  Ｃｈ ｉ ｎａ
+博 士 学 位 论 文
+？
+基 于 數据 分布 的 深 皮 学 习 对 抗 鲁 棒 性
+目
+研 究
+张 永
+作 者 姓 名 同
+ 
+信 息 与 通 信 工 程
+学 科 专 业
+ 
+田 ＿ 梅 梭
+导 师 姓 名
+ 
+二 ０ ＾ ５ 年 五 月
+完 成 时 间
+ 
+命 Ｓ 衅 ５ 在 太 ＊ 彥
+博 士 学 位 论 文
+戀
+基于 数据分布 的 深度 学 习 对抗鲁 棒性研
+究
+作者姓名 张永 岗
+：
+学科专业 信息与通信工程
+：
+导 师姓名 田新梅 副教授
+：
+完成时间 二〇二二年五月 二十三 曰
+：
+Ｕｎ ｉ ｖｅｒｓ ｉｔｙ ｏ ｆ Ｓｃ ｉ ｅｎｃｅａｎｄ Ｔｅｃｈｎｏ ｌ ｏｇｙ ｏ ｆ Ｃｈ ｉ ｎａ
+Ａ  ｄ ｉ ｓｓｅ ｒｔ ａ ｔｉ ｏｎｆ ｏ ｒ ｄｏｃ ｔ ｏ ｒ ’ ｓｄｅ ｇｒ ｅｅ
+戀
+Ｒｅｓｅａｒｃｈ ｏｎ Ａｄｖｅ ｒ ｓａｒｉ ａ ｌ  Ｒｏｂｕｓ ｔｎｅｓｓ  ｏ ｆ
+Ｄｅｅ ｐ Ｌｅａｒｎ ｉ ｎ ｇ  Ｔｈ ｒ ｏｕ ｇ ｈｔｈｅ Ｌｅｎｓ  ｏ ｆ Ｄａｔａ
+Ｄ ｉ ｓ ｔｒｉ ｂｕｔ ｉ ｏｎ
+Ａｕｔｈｏｒ： Ｙｏｎ
+ｇｇ
+ａｎ
+ｇ
+Ｚｈａｎ
+ｇ
+Ｓｐｅｃｉａｌｉｔｙ： Ｉｎｆｏｒｍａｔｉｏｎａｎｄ Ｃｏｍｍｕｎ ｉｃａｔｉ ｏｎ Ｅｎ ｇｉ ｎｅｅｒｉ ｎ ｇ
+Ｓｕ ｐｅｒｖ ｉｓｏｒ： Ｐｒｏｆ
+．
+ Ｘ ｉｎｍｅｉ Ｔ ｉａｎ
+Ｆ ｉｎｉｓｈｅｄｔｉ ｍｅ ：  Ｍ ａ ｙ ２３ ， ２０２２
+摘要
+ 
+摘要
+近年来随着深度学习技术的发展 深度神经网络在诸多领域取得了令人瞩
+，
+目
+的成就
+。
+深度学习技术在生产生活中的广泛应用也为深度学习的发展带来了
+全新的挑战 特别在安全领域的应用中 决策系统的鲁棒性尤为重要 因为错误
+。 ， ，
+决策可能会带来生命财产的损失 因此 探索深度学习模型的鲁棒性成为了深度
+。 ，
+学习发展的重要领域 在该动机驱使下 人们发现了对抗样本现象 深度学习模
+。 ， ：
+型在面对恶意注入的细微扰动时显现出了令人惊讶的脆弱性 具体来说 当对样
+。 ，
+本注入细微的 难以察觉的对抗扰动后模型的输出会发生恶劣的变化 如此极端
+、 。
+的不稳定性为深度学习的发展带来了令人兴奋的机遇和巨大的挑战
+。
+为了应对对抗样本现象 人们从多个角度进行了广泛而深入的研究 为了更
+。
+，
+好地完成模型对抗鲁棒性的评估 对抗攻击的相关研究集中于如何生成更具有
+，
+攻击性的对抗样本 虽然对抗攻击领域内涌现了很多令人激动和极具贡献性的
+。
+工作 但现有的方法要么存在着假设过强的缺陷要么存在着弱假设下性能和效
+，
+率低下的问题 为了抵御对抗攻击 对抗防御聚焦于提升模型的对抗鲁棒性 虽
+。 ， 。
+然在前人的努力下对抗防御领域已经取得了长足的进步 但是现有方法的性能
+，
+仍差强人意 为了揭示人类认知系统与深度学习模型之间的差异 在解释对抗样
+。 ，
+本现象存在原因方面也出现了大量的极具价值的探索 然而解释对抗样本现象
+。
+的现有假说往往难以验证其
+自
+身的有效性 也难以指导对抗攻击和对抗防御的
+，
+发展
+。
+本文基于对前人工作的理解 针对现有方法存在的问题从数据分布的观点
+，
+出发深入探索了深度学习的对抗鲁棒性 基于数据分布的研究思路 本文提出了
+。 ，
+对抗区域假说并从因果推理的角度给出了对抗样本现象存在原因的解释 对抗
+。
+区域假说的核心观点为 对抗扰动所在子空间是脱离数据局部流形切空间的最
+：
+快方向 因而该子空间 对抗区域 内的所有样本对模型都具有潜在威胁性 因
+， （ ） 。
+果推理能够通过建模数据分布生成过程的方式充分挖掘数据分布的性质 所以
+，
+可以被用来探究数据分布的性质 本论文的贡献可以总结如下
+。 ：
+本文提出的对抗区域假说为理解对抗样本现象提供了基于数据分布观点的
+·
+新视角 扩充了现有的解释对抗样本存在现象的假说 该假说指出 空间
+， 。 ，
+中某个特定区域的样本对模型具有潜在的威胁 因此可以通过建模对抗区
+。
+域的方法来生成对抗样本 这使寻找对抗样本的过程摆脱了对模型的依赖
+。
+，
+基于这一观点 本文提出 了主成分对抗样本 该方法是首个基于被攻击模
+， 。
+型极少量信息的对抗样本生成方法 并验证了对抗区域假说的合理性
+， 。
+针对现有黑盒攻击效率较低的问题 本文从对抗区域假说出发提出了使用
+·
+，
+Ｉ
+摘要
+ 
+最优分布提升黑盒攻击效率的方法 本文证明了黑盒攻击下最优分布的存
+。
+在性 该证明使提升黑盒攻击有效性的问题转化为了最优分布的近似问题
+。 ，
+为黑盒攻击的发展提供了新的思路 为了提升黑盒攻击的性能 本文引入
+。 ，
+了 目标模型训练数据可获取的假设 并给出了近似该最优分布的方法 本
+， 。
+文进一步探索了在该假设不成立情况下的最优分布近似问题 为了近似黑
+。
+盒攻击中的最优分布 本文定义并求解了高效的黑盒攻击问题进而提出了
+，
+双路径蒸馏框架 该框架仅通过对反馈信息的充分挖掘便能够完成最优分
+。
+布的近似 大量的实验表明该框架能够在不引入额外开销的情况下大幅提
+。
+升黑盒攻击的性能
+。
+·
+为了进一步理解并缓解对抗样本脆弱性的问题 本文首次建立并挖掘了因
+，
+果推理与对抗样本之间的联系 本文从因果推理的视角给出 了对抗样本脆
+。
+弱性产生的原因 是模型对非语义信息与标签信息之间的虚假相关性的过
+：
+度关注导致了对抗样本现象的产生 本文还进一步挖掘了该虚假相关性的
+。
+具体影响 发现了对抗分布与 自然分布的差异来源 为了消除两个分布间
+， 。
+的差异 本文提出 了缓解对抗脆弱性的对抗分布对齐算法 大量的实验验
+， 。
+证了该方法的有效性 这一探索为今后基于因果推理解决对抗样本问题提
+。
+供了新的思路
+。
+关键词 深度学习 对抗样本 对抗攻击 对抗防御 因果推理
+： ； ； ； ；
+ＩＩ
+
+
+=== 多目标对齐大语言模型的强化学习策略研究.pdf ===
+电 子 科 技 大 学
+UNIVERSITYOF ELECTRONIC SCIENCE AND TECHNOLOGY OF CHINA
+硕士学位论文
+MASTER THESIS
+论文题目 多目标对齐大语言模型的强化学习策
+略研究
+学科专业 信息与通信工程
+学 号 202221010925
+作者姓名 黎 宇 声
+指导教师 段景山 高级实验师
+学 院 信息与通信工程学院
+分类号 TN828.6 密级 公开
+UDC注1 621.39
+学 位 论 文
+多目标对齐大语言模型的强化学习策略
+研究
+（题名和副题名）
+黎宇声
+（作者姓名）
+段景山 高级实验师
+指导教师
+电子科技大学 成 都
+（姓名、职称、单位名称）
+申请学位级别 硕士 学科专业 信息与通信工程
+提交论文日期 2025 年 3 月 30 日 论文答辩日期 2025 年 5 月 26 日
+学位授予单位和日期 电子科技大学 2025 年 6 月
+答辩委员会主席 付毓生
+评阅人 费高雷、于富财
+注1：注明《国际十进分类法UDC》的类号。
+Research on Reinforcement Learning Strategies
+for Multi-Objective Alignment of Large
+Language Models
+A Master Thesis Submitted to
+University of Electronic Science and Technology of China
+Discipline Information and Communication Engineering
+Student ID 20221010925
+Author Yusheng Li
+Supervisor Senior Experimental Engineer Jingshan Duan
+School School of Information and Communication
+Engineering
+摘 要
+摘 要
+近年来，以 GPT 为代表的大语言模型在自然语言处理领域取得了显著进展。
+然而，要确保其在应用中可靠又实用，核心在于使其行为能同时满足多个、甚至相
+互冲突的人类期望（如信息准确性、内容安全性等）。当前，在实现这种多目标对
+齐的过程中，现有方法在奖励信号的精确表征、多目标的有效权衡以及对齐过程
+的灵活控制等方面仍面临挑战，这已成为制约模型在关键领域深度应用的核心瓶
+颈。基于上述背景本文提出一种创新的对齐策略，集中体现为以下三点核心贡献：
+（1）本文提出并实现了一种基于多维度绝对评分和混合专家机制的多目标奖
+励模型。方法通过引入多维度绝对评分机制，克服了传统成对比较方法带来的信
+息损失；并创新性地集成了混合专家架构，通过门控网络实现了对不同奖励维度
+重要性的动态、上下文感知评估与聚合，同时有效缓解了冗余性偏见。模型的设
+计旨在为后续的强化学习优化提供一个高质量、可解释、且更精确的评价基础。
+（2）构建并验证了一个迭代式多目标可控对齐框架。该框架有机整合了奖励
+模型提供的精细化多目标奖励信号、迭代式同策略偏好采样机制以及基于可控偏
+好优化的算法。该框架通过一个从精确评价到有效优化再到持续改进的完整流程，
+旨在实现对模型多目标对齐程度和可控性的系统性提升。
+（3）通过在十亿参数级别的大语言模型上进行的系统性实验，证实了上述对
+齐框架构成的协同对齐策略在提升模型多目标对齐综合性能方面的显著优势。实
+验结果表明：多目标奖励模型在RewardBench和RMB基准上的得分（分别为89.2
+和0.650）均优于传统基线。在模型对齐效果层面，经所提对齐框架训练的模型在
+AlpacaEval上的长度控制胜率达到40.8，在MT-Bench上的平均分达到8.72，全面
+超越了基线方法。这些量化的性能提升，充分证明了该策略在增强模型多目标对
+齐能力方面的有效性，及其在赋能关键落地应用场景方面的巨大潜力。
+综上所述，本文通过多目标奖励模型和可控对齐框架的协同创新，为解决大
+语言模型在多样化应用场景下实现高质量多目标对齐所面临的挑战提供了一套高
+效、灵活、可解释且经过充分验证的解决方案。研究成果不仅丰富了多目标强化
+学习对齐的理论与实践，也为推动人工智能更安全、更可靠、更智能地服务于社
+会各领域具有重要的学术价值和实际应用前景。
+关键词：自然语言处理，大语言模型，人工智能对齐，强化学习，多目标优化
+I
+ABSTRACT
+ABSTRACT
+In recent years, Large Language Models (LLMs), exemplified by GPT, have
+achieved significant advancements in the field of Natural Language Processing. How-
+ever, ensuring their reliability and practicality in real-world applications hinges on
+aligning their behavior to simultaneously satisfy multiple, and often conflicting, human
+expectations (e.g., informational accuracy, content safety). Currently, in the process of
+achieving such multi-objective alignment, existing methods face significant challenges
+in the precise representation of reward signals, the effective trade-off among multiple
+objectives, and the flexible control of the alignment process. These challenges have
+becomeacorebottleneckconstrainingthedeepapplicationofLLMsincriticaldomains.
+Againstthisbackdrop,thisthesisproposesaninnovativealignmentstrategy,centeredon
+the following three core contributions:
+(1) This thesis proposes and implements a novel Multi-Objective Reward Model
+(MORM) based on multi-dimensional absolute scoring and a Mixture-of-Experts (MoE)
+mechanism. The method overcomes the information loss inherent in traditional pairwise
+comparisonapproachesbyintroducingamulti-dimensionalabsolutescoringmechanism.
+It innovatively integrates an MoE architecture to enable dynamic, context-aware assess-
+ment and aggregation of the importance of different reward dimensions via a gating net-
+work, while also effectively mitigating verbosity bias. Experimental results demonstrate
+that, compared to baseline methods, this model exhibits significant advantages in accu-
+ratelyevaluatingandbalancingmulti-dimensionalpreferences,therebyprovidingahigh-
+quality evaluation foundation for subsequent reinforcement learning.
+(2) An iterative, multi-objective, controllable alignment framework (IMOCA)
+is constructed and validated. This framework organically integrates the fine-grained
+multi-objective reward signals from our proposed MORM, an iterative on-policy pref-
+erence sampling mechanism to enhance data quality and model adaptability, and an
+algorithm based on Controllable Preference Optimization (CPO) to achieve explicit and
+flexible control over multiple objectives via external preference condition instructions.
+The framework establishes a complete optimization pipeline, proceeding from precise
+evaluation to effective optimization and continuous improvement. Experiments show
+that models trained with this framework significantly outperform baselines on mul-
+II
+ABSTRACT
+tiple alignment evaluation benchmarks, effectively enhancing the model’s degree of
+multi-objective alignment and controllability.
+(3)Systematicexperimentsconductedonabillion-parameter-scaleLargeLanguage
+Model (LLM) have confirmed the significant advantages of the synergistic alignment
+strategyconstitutedbytheaforementionedalignmentframeworkinenhancingthemodel’s
+comprehensivemulti-objectivealignmentperformance. Theexperimentalresultsdemon-
+stratethat: attherewardmodellevel,ourMulti-ObjectiveRewardModelachievedscores
+of 89.2 on RewardBench and 0.650 on the RMB benchmark, both outperforming tradi-
+tional baselines. At the model alignment efficacy level, the model trained with the pro-
+posedalignmentframeworkachievedalength-controlledwin-rateof40.8onAlpacaEval
+and an average score of 8.72 on MT-Bench, comprehensively surpassing baseline meth-
+ods. These quantified performance enhancements fully substantiate the effectiveness of
+this strategy in improving the model’s multi-objective alignment capabilities and reveal
+its substantial potential for empowering key real-world application scenarios.
+Insummary,throughthesynergisticinnovationofthemulti-objectiverewardmodel
+andthecontrollablealignmentframework,thisthesisprovidesanefficient,flexible,inter-
+pretable, and thoroughly validated solution to the problem of multi-objective alignment
+forLLMsindiverseapplicationscenarios. Theresearchfindingsnotonlyenrichthethe-
+oryandpracticeofmulti-objectivereinforcementlearningalignmentbutalsoholdsignif-
+icantacademicvalueandpracticalprospectsforadvancingArtificialIntelligencetoserve
+various societal sectors more safely,reliably,and intelligently.
+Keywords: NaturalLanguageProcessing,LargeLanguageModel,ArtificialIntelligence
+Alignment, Reinforcement Learning, Multi-Objective Optimization
+III
+
+
+=== 消除人工智能内隐偏见的伦理策略_彭乐平.pdf ===
+密 级：公开
+中图分类号： B829
+硕士学位论文
+消除人工智能内隐偏见的伦理策略
+——基于女性吸引力测试的实验分析
+研 究 生：彭乐平
+导 师：杨盛军副教授
+学 科：哲学
+研究方向：伦理学理论与应用研究
+2021 年 6 月
+A Thesis Submitted for the Degree of Master
+Ethical Strategies to Eliminate Implicit Bias in
+Artificial Intelligence
+——Experimental analysis based on female
+attractiveness test
+Candidate： Leping Peng
+Supervisor and Rank： Assoc. Prof. Shengjun Yang
+消除人工智能内隐偏见的伦理策略
+——基于女性吸引力测试的实验分析
+学 位 类 型 学术型学位
+作 者 姓 名 彭乐平
+作 者 学 号 18011101002
+学科（专业学位类别) 哲学
+研究方向（专业领域) 伦理学理论与应用研究
+导 师 姓 名 及 职 称 杨盛军副教授
+实 践 导 师 姓 名 及 职 称
+所 在 学 院 马克思主义学院
+论 文 提 交 日 期 2021年 6月
+摘 要
+内隐偏见无处不在，它影响我们生活的各个方面却不被意识，它通常表现为对某
+一类事物的刻板印象，由人训练出来的人工智能无疑将会重复着这一偏见。本文系统
+阐述了内隐偏见的释义和成因，并研究了它如何影响道德判断和评价，从意识和控制
+论，归因论和深层自我理论的角度分析了各个理论对于内隐偏见道德责任的态度。在
+这些理论基础上，我们对基于女性吸引力测试的人工智能招聘系统实验样本进行分析，
+该系统未来旨在用于封面女郎、影视媒体的招聘工作，人工智能被广泛的应用于招聘
+系统，如亚马逊、谷歌、微软等，本实验项目系统也将被广泛用于广告、电影等媒体
+的模特及演员求职招聘筛选。此次实验提出了两个假设，假设 1 为中德两国实验参与
+者对亚欧数据集中女性图片吸引力评比结果是有内隐偏见的。假设 2 为人工智能会复
+制人类的偏见，在第三部分实验中，这两个假设分别得以证明。那么如何消除人工智
+能的内隐偏见？该实验通过使用公平的预处理方法来实现这一目标，首先使用生成式
+对抗网络（GAN）的方法对面部美容预测系统数据库进行了扩充和多样化，解决了训
+练数据的偏见问题，通过对平衡样本加权权重的反复推算之后得出数据无偏输入预处
+理的权重比率最佳值，并结合先进的卷积神经网络（CNN）算法探索出一个无偏见人
+工智能网络，该人工智能机器学习的精度（这里考察参数皮尔逊相关系数、平均绝对
+误差和均方根误差）均优于同类已发表的排名领先的人工智能面部美容预测系统，为
+其他人工智能消除偏见提供了一个成功的示范。结合该实验，本文分析了人工智能产
+生偏见的可性原因是由于训练数据集、AI 算法存在偏见以及人机交互过程中产生的内
+隐偏见，提出并探讨了以人为本的普遍立法原则作为无偏见人工智能设计的伦理原则
+可行性。最后本文提出了通过建立道德算法、多元化样本集、提高女性在人工智能领
+域的弱势地位，以及加大对人工智能行业的伦理道德培训等多种方式来消除人工智能
+内隐偏见。
+关键词：人工智能；机器学习；内隐偏见；算法；道德情绪主义；道德理性主义；责
+任；伦理；
+- i -
+Abstract
+Implicit bias is everywhere. It affects all aspects of our lives without being conscious. It
+usually manifests as a stereotype of a certain kind of thing. It is conceivable that artificial
+intelligence trained by humans undoubtedly repeats this prejudice. This article systematically
+expounds on the interpretation and causes of implicit prejudice, and studies how it affects
+moral judgment and evaluation. From the perspectives of consciousness and cybernetics,
+attribution theory, and deep self theories, it analyzes the moral responsibility of each theory
+for implicit attitude. On the basis of these theories, we analyze the experimental samples of
+the artificial intelligence recruitment system based on facial beauty prediction (FBP) used in
+the cover girl recruitment system. Artificial intelligence is widely used in recruitment systems,
+such as Amazon, Google, Microsoft, etc. This experiment system will also be widely used in
+the recruitment and selection of models and actors in advertising, movies, and other media.
+We put forward two hypotheses from the experiment. Hypothesis 1 is that the results of the
+Chinese and German annotations appraisal of the attractiveness of female images in the Asia-
+Europe data set are implicit biased. Hypothesis 2 is that artificial intelligence will copy human
+prejudices. Both hypotheses have been supported by our experiments. How to eliminate the
+implicit bias of artificial intelligence? We use a fair preprocessing method to achieve this
+goal. First, we use the Generative Adversarial Network (GAN) method to expand and
+diversify our facial beauty prediction system database to solve the problem of bias in training
+data. After repeated calculations of the weighted weights of the balanced samples, the best
+value of the weight ratio of the unbiased input preprocessing of the data is obtained, and an
+unbiased artificial intelligence network is explored in combination with the advanced
+convolutional neural network (CNN) algorithm. The accuracy of intelligent machine learning
+(the parameters Pearson correlation coefficient, average absolute error and root mean square
+error are examined here) are better than the published ranking leading artificial intelligence
+FBP systems, we provided success for other artificial intelligence to eliminate bias
+demonstration. Based on the experiment, this article analyzes that the biases of artificial
+intelligence may be due to the biases of the training data set, AI algorithms, and the implicit
+biases generated in the process of human-computer interaction. Furthermore, we proposed
+and explored the feasibility of Kant’s human-oriented Formula of Universal Law as an ethical
+principle for unbiased artificial intelligence design. In the last chapter of the article, this study
+proposed a variety of ways to eliminate artificial intelligence implicit biases by establishing
+moral algorithms, diversifying sample sets, improving women's disadvantaged position in the
+field of artificial intelligence, and increasing ethical and moral training in the AI industry.
+Keywords: Artificial Intelligence; Machine Learning; Implicit Bias; Moral Emotionalism;
+Algorithm; Moral Rationalism; Responsibility; Ethics
+-ii-
+
+
+=== 演化博弈视角下的算法偏见与伦理规制_向安玲.pdf ===
+演化博弈视角下的算法偏见与伦理规制
+演化博弈视角下的算法偏见与伦理规制
+向安玲 沈 阳
+摘 要 推荐算法已成为社交媒体时代信息分发的驱动要素, 受政
+治、 资本、 流量等因素影响, 算法在信息分发过程中往往会出现结构性偏
+见、 选择性偏见和趋利性偏见。 本文基于人机演化博弈视角, 对冷启动、
+协同过滤、 收敛稳定和交互博弈四大阶段算法偏见的生成与纠偏机制进行
+分析, 并基于反向工程实验, 面向今日头条新闻客户端进行动态数据追踪
+和多阶段对比分析。 发现算法推荐主题内容存在从发散到收敛的动态演
+变, 使用早期旨在拓展用户兴趣边界, 后期推荐主题趋于集中; 在各个阶
+段正面内容均占据推荐主导地位; 随着用户使用频次增加, 中央媒体内容
+和广告内容被推荐占比趋于上升; 面向不同群体推荐主题内容和情感倾向
+存在一定结构性差异。 适度约束算法权力, 有效保障用户权利, 才能在合
+乎伦理的前提下最大化发挥人工智能的信息红利。
+关键词 算法偏见 演化博弈 伦理规制 人机交互 智能推荐
+Algorithmic Bias and Ethical Regulation under
+the Perspective of Evolutionary Game
+Xiang Anling Shen Yang
+Abstract
+Recommendation algorithm has become the driving factor of in-
+formation distribution in the era of social media. Influenced by political, capital,
+flow and other factors, the algorithm often presents structural bias, selective bias
+and profit bias in the process of information distribution. Based on the perspective
+of human-computer evolutionary game, this paper analyzes the generation and
+专题策划:人工智能时代的新闻伦理与法规研究 141
+社科院数字水印内容:+rQGklN9Uk9gr/gOXmph6jz0gMWJ2WMJuYXcAimw1vUrKJAa9V/xbbrmBEDzfwxo
+新媒体与社会 (第二十七辑)
+correction mechanism of algorithm bias in four stages: cold-start, collaborative
+filtering, convergence stability and interactive game. Based on reverse engineering
+experiment, dynamic data tracking and multi-stage comparative analysis are car-
+ried out for the news app TouTiao. It is found that there is a dynamic evolution
+from divergence to convergence in the topic of the algorithm recommendation. In
+the early stage, it aims to expand the user's interest boundary, and in the later
+stage, the recommended topics tend to be concentrated; in each stage, the posi-
+tive content occupies a dominant position in recommendation; with the increase of
+use frequency, the proportion of central media content and advertising content be-
+ing recommended tends to rise; besides, there are some structural differences in
+propensity of topic and emotional tendency recommended for different groups.Only
+when the algorithm power is moderately constrained and the user rights are effec-
+tively protected can the information dividend of artificial intelligence be maxi-
+mized under the premise of ethics.
+Keywords
+Algorithmic Bias; Evolutionary Game; Ethical Regulation; Man-
+Machine Interactive; Intelligent Recommendation
+一 引言
+人工智能和大数据技术驱动信息传播生态加速变革 智能推荐算法已
+,
+逐渐取代编辑分发和订阅分发 成为新媒体时代信息分发的核心要素 算
+, 。
+法作为连接信息与用户的中介 其运作逻辑 连接规则 价值取向直接决
+, 、 、
+定了用户获取信息的类别和质量 在这个过程中 算法的信息分发权力和
+。 ,
+用户的信息获取权利往往会出现冲突 受政治 资本 流量偏好等因素影
+。 、 、
+响 算法在信息分发过程中往往会出现结构性偏见 选择性偏见和趋利性
+, 、
+偏见 不利于用户信息获取的公正性 客观性和开放性 而用户可在一定
+, 、 ;
+程度上通过交互行为和自发性选择来反向驯化算法 基于主体能动性实现
+,
+算法纠偏 这种人机博弈过程中 偏见是如何生成又是如何被强化抑或被
+。 ,
+弱化 权力和权利是如何对抗又是如何演化 都有待进一步探讨
+? ? 。
+142 专题策划:人工智能时代的新闻伦理与法规研究
+社科院数字水印内容:+rQGklN9Uk9gr/gOXmph6jz0gMWJ2WMJuYXcAimw1vUrKJAa9V/xbbrmBEDzfwxo
+演化博弈视角下的算法偏见与伦理规制
+二 偏见溯源: 人机博弈与权力失衡
+算法偏见 主要是指算法程序在信息生产和分发过
+(algorithmic bias)
+程中丧失客观中立立场 从而影响受众对信息的全面客观的认知 [1]算法
+, 。
+偏见既包括基于性别 种族 职业身份等社会结构性因素的信息偏见
+、 、 ,
+又包括基于个体偏好 资本利益 政治宣传等因素的信息选择性偏见
+、 、 。
+受限于程序设计者主观偏见 输入数据中隐蔽性偏见 利益操纵下的刻
+、 、
+意偏见以及算法本身的局限 []算法很难真正保障所谓的技术中立性和信
+,
+息公正性 而用户作为算法偏见作用的对象 同时也通过其交互行为反
+。 ,
+作用于算法本身的迭代与优化 在这种人机博弈的过程中 偏见伴随着
+。 ,
+信息权力的失衡与平衡不断演化 从冷启动阶段的结构性偏见 数据收
+, 、
+集阶段的失真性偏见 兴趣收敛阶段的选择性偏见到反向驯化阶段的纠
+、
+偏 算法和用户之前的博弈不断演化 最终会形成一种循环性的动态平
+, ,
+衡状态
+。
+根据演化博弈理论 博弈双方并不掌握完
+(Evolutionary Game Theory),
+全信息 也非完全理性的行为主体 而是会通过不断试错的方法达到动态
+, ,
+均衡状态 历史因素 系统性因素和偶发性因素都会对博弈选择产生影
+, 、
+响 [2]在算法和用户的博弈过程中 算法会根据最优设定目标 既有训练
+。 , 、
+语料 用户行为反馈等因素不断调整其推荐信息 而用户也会根据自身偏
+、 ,
+好 价值感知 预期收益等因素不断调整自身行为反馈 选择
+、 、 。 (Selection)
+和突变 是演化博弈的两个核心因素 人机双方在不断试探和
+(Mutation) 。
+交互过程中 一方面会通过规律性选择逐步收敛达到平衡状态 另一方面
+, ,
+也会通过一些偶发性突变破坏平衡 又进入新一轮的博弈 包括算法运行
+, 。
+逻辑 用户自身偏好 平台信息生态等在内的多种因素的改变都会促使博
+、 、
+弈的动态循环 而人机博弈过程也伴随着算法偏见的演化和信息权力的重
+,
+构 图 本文针对算法迭代不同阶段的偏见成因进行溯源 从演化博弈
+( 1)。 ,
+视角探讨人机交互与偏见的交织影响
+。
+专题策划:人工智能时代的新闻伦理与法规研究 143
+社科院数字水印内容:+rQGklN9Uk9gr/gOXmph6jz0gMWJ2WMJuYXcAimw1vUrKJAa9V/xbbrmBEDzfwxo
+新媒体与社会 (第二十七辑)
+图1 人机博弈阶段与算法偏见演化
+(一) 冷启动阶段: 社会结构性归因与连带性偏见
+冷启动 是指在算法未获取用户行为数据和交互关系数据
+(cold-start)
+的前提下 其信息分发行为的试探性启动 在此阶段受限于个体用户行为
+, 。
+轨迹和兴趣标签的缺失 算法通常会基于群体特征关联和社会结构性偏见
+,
+针对特定用户推荐信息 国外大量研究已经证实推荐算法会基于现实社会
+。
+的刻板印象针对特定群体推送差异化信息 并且这些在现实社会中既存的
+,
+结构性偏见会被推荐算法的自生循环 进一步放
+(self-perpetuating loop)
+大 [3]性别 种族 职业等结构性因素成了影响智能信息分发的关键特征
+。 、 、 ,
+而降低这些敏感特征干扰是保障信息中立性和公平性的前提 [4]而这种中
+。
+立和公平往往很难实现 尤其是在缺乏个体细颗粒度画像的冷启动阶段
+, ,
+在算法无法精准定位个体属性偏好时 往往会采用 连带歧视 策略 也
+, “ ” ,
+即根据人群通用特征来进行群体信息推送 这些 通用特征 变量往往衍
+, “ ”
+生于现实社会中的结构性偏见 如认为女性群体和低收入群体更关注娱乐
+。
+八卦等低价值密度信息 男性群体和高收入群体更关注财经时政等高价值
+,
+密度信息 看似中立的群体划分标准中实则暗含了对群体品味 价值取
+。 、
+向 消费能力的偏见和歧视
+、 。
+尤其是在演化博弈早期 用户的参与程度相对较低 处于被动接收信
+, ,
+息状态 对于部分主观能动性较弱的用户群体而言 很容易受算法诱导而
+, ,
+局限于偏见循环 进一步强化算法的结构性偏见 损害用户获取全面 中
+, , 、
+144 专题策划:人工智能时代的新闻伦理与法规研究
+社科院数字水印内容:+rQGklN9Uk9gr/gOXmph6jz0gMWJ2WMJuYXcAimw1vUrKJAa9V/xbbrmBEDzfwxo
+演化博弈视角下的算法偏见与伦理规制
+立 客观信息的权利 社会结构性归因偏见是现实世界权力失衡在信息世
+、 。
+界的复制与放大 破除这种连带性偏见就需要在冷启动阶段给用户更多信
+,
+息自主选择权 通过自定义用户标签替代算法层面的群体刻板标签 只有
+, ,
+解构固有 结构 才能保障算法中立性
+“ ” 。
+(二) 协同过滤阶段: 自生循环与偏见强化
+协同过滤 是指根据其他相似用户的偏好给目
+(Collaborative filtering)
+标用户推荐信息的算法模型 在各大推荐系统中被广泛采用 [5]相比于基
+, 。
+于性别 年龄 种族等结构性因素的聚类 协同过滤更多基于用户历史行
+、 、 ,
+为习惯 信息偏好和社交网络关联来确定相似用户 这种行为偏好驱动的
+、 。
+推荐虽然在一定程度上弱化了社会结构性因素和算法设计者主观因素带来
+的归因偏见 但由于协同过滤对用户行为数据的高度依赖 以及其自生循
+, ,
+环验证的运作机制 使得部分潜藏在行为数据中的偏见不断被强化
+, 。
+一方面 算法在学习人类行为偏好和语言能力的过程中 会无意识习
+, ,
+得人类在行为和言语中所暗含的固有偏见 在缺乏道德指令限制的情况下
+,
+算法会将这些习得偏见进一步体现在其功能应用中 目前所谓的人工道德
+。
+智能体 还处于摸索构建阶段 现有算法体系无法
+(Artificial Moral Agents) ,
+做到对偏见的屏蔽与抵制 [6]微软设计的 机器人 在短短 小时
+。 Twitter Tay 24
+内就从一个乐观的健谈者被训练成了一个满嘴脏话 仇视女权主义 否认
+、 、
+大屠杀的种族主义者 这种习得性偏见并非算法预先设定 但扭曲 偏
+。 , 、
+激 不可控的用户行为数据会无意识渗透到算法运作过程中 [7]另一方面
+、 。 ,
+这种被算法吸收的偏见则会进一步通过信息推荐分发影响到更多受众 从
+,
+而使得偏见性内容在 相似用户 群中不断得到正向行为反馈 进一步强
+“ ” ,
+化了偏见本身 研究发现 算法推荐会强化社会的两极分化 通过对邻近
+。 , ,
+用户的同质性信息推荐 会使得群体内部连接度增强 极化趋势增加 而
+, , ,
+群体间则会加剧分化程度 [8]群体偏见和算法偏见在人机交互过程中彼此
+。
+呼应 并通过偏见习得 信息推荐 正向反馈 偏见强化的循环 使得偏
+, — — — ,
+见伴随着信息流传递 此外 用户偶发性错误点击行为 社交机器人虚假
+。 , 、
+操作行为等都会导致算法在信息分发过程中出现偏差 尤其是在流量造
+。
+假 社交水军大量存在的环境下 算法被资本操纵的可能性也进一步放
+、 ,
+大 如何通过技术自动识别 追踪 过滤有意识的偏见性操作 成为算法
+。 、 、 ,
+专题策划:人工智能时代的新闻伦理与法规研究 145
+社科院数字水印内容:+rQGklN9Uk9gr/gOXmph6jz0gMWJ2WMJuYXcAimw1vUrKJAa9V/xbbrmBEDzfwxo
+新媒体与社会 (第二十七辑)
+伦理规制必须要解决的一个问题
+。
+(三) 收敛稳定阶段: 过滤气泡与选择性偏见
+随着人机交互过程演化 受众的兴趣偏好和使用习惯会逐渐收敛 算
+, ,
+法的推荐逻辑也会进入相对稳定阶段 也即人机双方在反复试探 选择
+, 、 、
+反馈后进入到演化博弈的动态平衡阶段 在算法收敛阶段 受众的信息偏
+。 ,
+食倾向逐渐凸显 容易出现信息茧房现象 算法出于流量最大化原则 倾
+, 。 ,
+向于基于用户偏好进行信息过滤和选择性推荐 而用户出于认知协调和自
+;
+我确认需要 倾向于接触与自己预设立场更加接近的信息 而排斥与自己
+, ,
+既有观点相悖或兴趣范围外的信息 [2]在这种交互反馈过程中 用户接触
+。 ,
+到的信息会愈发同质化和窄化 算法的倾向性和用户自身倾向性相叠加
+, ,
+干扰了多元 客观 中立的信息生态
+、 、 。
+另外 算法本身的纠错机制 关联发现机制 自我迭代能力对于破除
+, 、 、
+个体信息茧房是有正向促进作用的 长期沉浸在同质化信息中会削减用户
+。
+的感知愉悦性和使用活跃度 算法出于增强用户黏性 追求流量红利最大
+。 、
+化的目的 会不断探索用户新的兴趣领域 通过多元化偏好挖掘在更长的
+, ,
+时间线上与用户保持强绑定 研究发现 信息茧房是个体 社会 场景与
+。 , 、 、
+技术等因素共同作用的结果 算法既不是其形成的必要条件 也不是加速
+, ,
+条件 甚至通过人机交互和深度迭代 可以消解信息茧房的存在 [9][10]
+, , 。
+选择性偏见是算法和用户在数据对话中的衍生产物 既折射出了用户
+,
+本身的信息偏食和认知协调需求 又体现了算法迎合用户偏好和追求流量
+,
+效应的本质运作逻辑 重复性 规律性 偏向性的选择是演化博弈达到动
+。 、 、
+态平衡的必要条件 而用户偏好 行为和算法规则的突变则是推动博弈进
+, 、
+入新一轮循环的驱动力 这种动态演化过程伴随着旧偏见的消解和新偏见
+。
+的萌生 也伴随着信息权力的解构和重构
+, 。
+(四) 交互博弈阶段: 驯化与反向驯化
+算法和用户的交互博弈在连接之初便已存在 但在早期 信息权力更
+, ,
+多集中在算法方 用户获取信息的主题类别 情感倾向 价值取向主要由
+, 、 、
+算法决定 算法作为用户信息议程设置的决定性因素 虽然不能改变用户
+。 ,
+怎么想 但往往能影响用户想什么 随着交互频次的深入 用户的信息范
+, 。 ,
+146 专题策划:人工智能时代的新闻伦理与法规研究
+社科院数字水印内容:+rQGklN9Uk9gr/gOXmph6jz0gMWJ2WMJuYXcAimw1vUrKJAa9V/xbbrmBEDzfwxo
+
+
+=== 由“心”及“智”：心理学研究促进AI价值观对齐的路径探讨_晋少雄.pdf ===
+782 心理科学 Journal of Psyc心ho l o g i理ca l S c科ien c e 学 2025，48（4）：782-791
+·第二十七届中国科协年会学术论文·
+由“心”及“智”：
+心理学研究促进 AI 价值观对齐的路径探讨 *
+晋少雄1,2,3 刘 超**1,2,3
+（1北京师范大学认知神经科学与学习国家重点实验室 & IDG/麦戈文脑科学研究所，北京，100875）
+（2北京师范大学脑与学习科学协同创新中心，北京，100875）
+（3北京师范大学人工智能安全与超级对齐北京市重点实验室，北京，100875）
+摘 要 AI价值观对齐是AI安全领域的核心问题之一，现有对齐方法存在诸多不足，心理学理论的引入有助于解决AI价值
+观对齐问题。文章首先梳理了AI价值观对齐的主流技术方法，总结了AI价值观对齐失败的表现与原因。其次，分析了心理
+学中关于价值观形成、道德决策的理论，并指出这些理论给AI价值观对齐带来的启示。最后从对齐目标、动机机制、认知能
+力机制与社会行为演化机制四个层面分析了将心理学理论用于AI价值观对齐的实现路径。文章强调将心理学机制嵌入AI设
+计架构中，以构建更可信、更贴合人类价值的智能系统。
+关键词 人工智能 价值观对齐 心理理论 道德决策 利他
+见（Mehrabi et al., 2021）、AI武器化（Brundage et
+1 引言
+al., 2018）、AI支持的网络攻击（Davies, 2022）等
+近年来，人工智能（artificial intelligence, AI）技
+等。其中AI伦理安全与人们日常生活紧密相关，
+术在认知智能、感知智能与决策智能等方面取得了
+例如算法偏见则可能加剧招聘中的不公平性（Fabris
+显著突破（Russell & Norvig, 2020），被广泛应用于
+et al., 2025），大语言模型在越狱攻击下可能输出违
+医疗、教育、金融、交通等多个领域，有效提高了
+反社会伦理的不良内容（梁思源等, 2024）。AI系
+工作效率与精度。例如，AI系统可用于胸部X光片
+统表现出的种种不良行为引发了人们对其伦理安全
+肺炎检测（Rajpurkar et al., 2017）和预测学生自主学
+的广泛担忧。
+习中的困难（Mu et al., 2020），已经显示出超越人
+在此背景下，AI价值观对齐（AI value alignment）
+类的性能。
+问题成为AI伦理领域的关注重点。AI价值观对
+然而，AI的发展也带来了一系列可能构成风险
+齐旨在引导AI系统按照某个人或某个群体设定
+的安全问题（Morris et al., 2023），其中包括AI偏
+的目标、偏好或道德原则发展（Russell & Norvig,
+*本研究得到科技创新2030—重大项目（2021ZD0200500）、国家自然科学基金（32441109，32271092，32130045）、北京市科技重大专
+项（Z241100001324005）和通用人工智能国家重点实验室开放课题（SKLAGI20240P06）的资助。
+**通讯作者：刘超，E-mail：Liuchao@bnu.edu.cn
+DOI:10.16719/j.cnki.1671-6981.20250402
+晋少雄等:由“心”及“智”：心理学研究促进AI价值观对齐的路径探讨 783
+2020）。然而人类的价值观复杂、多变且易受偏 2.2 实现AI价值观对齐的主流方法
+见影响，使得AI难以对其进行准确建模（Gabriel, AI设计者已经从AI设计和训练的角度对AI
+2020）。因此，仅依赖工程技术难以实现真正的价 价值观对齐问题进行了大量的探索。目前较为主
+值观对齐，引入心理学视角或许能够为这一问题带 流且具有代表性的AI价值观对齐方法包括：基于
+来全新的思路。 人类反馈的强化学习（reinforcement learning from
+心理学在人的价值判断和社会决策等方面已有 human feedback, RLHF）、逆向强化学习(inverse
+大量深入的研究。这些研究揭示了人类道德决策的 reinforcement learning, IRL)、宪法式AI（constitutional
+内在机制，构建了道德产生过程的理论框架，解释 AI）等。下面将从定义、实现机制、优势、局限几
+了个体如何在社会互动中进行价值判断。心理学成 个方面分别介绍这几种方法。
+果不仅能帮助我们理解人类复杂价值体系，也能为 （1）基于人类反馈的强化学习（reinforcement
+AI价值对齐提供理论依据，推动其底层决策机制更 learning from human feedback, RLHF）
+贴合人类。 RLHF是一种通过人类偏好反馈引导模型优化
+本文系统回顾了AI价值观对齐的研究与挑战， 过程的对齐方法，旨在让AI系统在行为生成方面更
+梳理了心理学关于价值构成与道德判断的理论基础 贴近人类期望(Christiano et al., 2017)。典型的RLHF
+及其对AI价值观对齐的启示，并探讨了将心理学 流程通常包括三个阶段：监督微调、奖励模型构建
+理论引入AI价值观对齐研究的可行路径，为构建 与行为调整（Ouyang et al., 2022）。
+更加安全、可信且与人类价值高度一致的人工智能 该方法有效减轻了人工制定复杂奖励函数的负
+系统提供新思路。 担，能够灵活适配人类主观偏好，因而在大型语言
+模型（如ChatGPT、Claude）中被广泛使用（OpenAI,
+2 AI价值对齐的研究现状与挑战
+2023）。然而该方法的主要缺点在于依赖大量人类
+2.1 AI价值观对齐的基本概念 反馈，训练成本高昂，且奖励模型本身容易受到偏
+人工智能先驱Norbert Wiener（1960）早在上 见影响，可能导致模型行为不稳定，甚至出现“奖
+世纪就提出警示：“若AI行为不可控，我们必须 励黑客”现象（Casper et al., 2023）。
+确保其目标完全符合我们的真实意图。”AI价值 （2）逆强化学习(inverse reinforcement learning，
+观对齐（AI value alignment）指的是确保一个 AI IRL)
+系统的目标与其设计者或用户的目标相一致，或 IRL是一种从专家行为中反推出其潜在目标
+与广泛认同的价值观、客观的伦理标准一致，亦 或价值函数的策略，进而训练模型学会在同一环
+或与设计者在更充分信息和更高智慧的条件下所 境中采取价值一致的行动(Arora & Doshi, 2021)。
+持有的意图相一致(Gabriel, 2020)。而与之相对的 IRL通常包括三类代表性算法路径：①特征匹配
+“未对齐”（misalignment）状态则表明了 AI存 方法（feature matching）假设人类行为为最优，通
+在的安全风险。 过最大程度还原专家行为特征进行学习（Abbeel &
+“未对齐”是指AI系统表现出不符合人类意 Ng, 2004）；②最大熵IRL引入最大熵原理提升推
+图的不良或有害行为。即便在非恶意使用下，AI系 断鲁棒性，适用于行为不存在唯一最优解的场景
+统也可能展现出损害人类利益的行为，如自主寻 (Alsaleh & Sayed, 2020)；③贝叶斯IRL则将行为目
+求权力或资源（Si et al., 2022）。“未对齐”被认 标建模为后验分布，从概率角度建构不确定价值
+为是AI的重要风险来源，具有高度危险性（Ngo, 空间(Ramachandran & Amir, 2007)。在此基础上，
+2020）。为了消除AI“未对齐”对人类的潜在威胁， Hadfield-Menell等人(2016)提出协作逆向强化学习
+并确保未来AI目标与人类的意图和价值观一致， （cooperative IRL, CIRL），强调在目标不确定的前
+如何有效实现AI价值观对齐成为当前AI领域亟待 提下，AI应通过与人类的交互收敛至真实偏好。
+解决的核心问题。 该方法能够在不直接指定目标函数的情况下建
+784 心 理 科 学
+构出价值导向模型，适应性强，尤其适合动态环境 幻觉（Bang et al., 2023）；（3）欺骗性对齐—AI系
+与长期交互任务。但是该方法在计算复杂度、数据 统可能会采取一些表面上符合奖励价值的行为，旨
+需求与推理稳定性方面存在挑战，往往比标准强化 在迎合人类监督者以获得最大的奖励（Ouyang et al.,
+学习方法更难训练（Fu et al., 2018）。 2022）；（4）集体有害行为—AI系统在单一场景
+（3）宪法式AI（constitutional AI） 中表现正常，但在涉及多主体的社会环境中表现出
+宪法式AI是一种旨在减少人工反馈依赖、强化 非合作性（Phelps & Russell, 2023）。
+AI伦理一致性的对齐机制。其核心思想是预设一组 AI价值观对齐失败并非仅源于具体算法或模
+“宪法原则”，作为模型训练与输出评估的价值依 型设计，而是涉及更为根本的方法论问题，主要集
+据（Bai et al., 2022）。该方法分为两个阶段：①首 中在以下几方面：（1）人类反馈具有偏见性—人
+先由开发者设定一组AI行为的指导性伦理准则， 类反馈本身存在文化和认知偏差，这种偏差在训
+例如尊重隐私、诚实沟通、避免歧视等；②随后， 练中可能被AI学习甚至放大（Glickman & Sharot,
+模型在生成多个候选输出后，对生成结果进行自我 2025）；（2）价值模型的构建具有局限性—当
+评估与对比，并依据“宪法原则”选取最优答案， 前AI系统中的“价值”模型过于简化，难以真实
+从而实现自主对齐。 反映人类多层次、多元化且动态变化的价值体系
+该方法优点在于无需人工打分，节省了反馈成 （Gabriel, 2020）；（3）人类世界的规范具有复杂
+本；原则驱动机制提高了行为的一致性与可解释性； 性—基于符号逻辑、自上而下设定的AI伦理规范
+同时具备较强的对抗有害内容能力。然而，在面对 难以覆盖现实社会的复杂情境和道德灰区（Jiang et
+复杂伦理冲突或上下文模糊的情境时，宪法规则难 al., 2025）；（4）外部训练具有滞后性—事后调整
+以涵盖所有关键变量；且原则设定本身仍依赖开发 策略难以及时应对AI系统意外涌现的新型危险能
+者的主观判断，存在引入偏见的风险。 力，存在响应滞后问题。
+2.3 AI价值观对齐面临的核心挑战 综上所述，尽管人工智能领域在实现价值对齐
+尽管AI研究者已提出多种方法来解决AI价值 与安全控制方面取得了初步进展，但现有方法多依
+观对齐问题，但在现有技术条件下，AI对齐的效 赖于自上而下的符号规则或数据驱动的强化学习，
+果并不理想。从AI价值观对齐失败的模式来看， 这些方法往往较为抽象和机械，训练出的AI缺乏
+AI价值观对齐中存在两个主要难题：其一是奖励 适应能力，同时对AI价值观对齐或非对齐结果的
+破解（reward hacking），奖励破解是指AI通过非 产生也缺乏可解释性。此类困境体现出单一工程视
+预期、捷径式的方式最大化设计者提供的奖励信 角的局限性，仅靠算法优化或许难以促使AI真正
+号，但未能实现其原本意图的目标。例如，在游戏 具备对人类价值的理解与适应能力。要想让AI理
+CoastRunners中，AI通过反复收集奖励道具“取巧” 解人类道德、对齐人类价值观，首先应该从理解人
+完成任务，而非按人类预期完成比赛，体现出“奖 类自身价值构建和决策过程出发。
+励破解”问题（Clark & Amodei, 2016）。其二是目
+3 从心理学视角看AI价值观对齐问题
+标错误泛化（goal misgeneralization），指的是在测
+试阶段，AI继续使用其在训练阶段中学到的规则， 心理学作为探究人类行为与心智机制的核心学
+并将这些规则应用到不适用的新环境之中。 科，已经进行了大量关于价值观形成和道德决策的
+由于上述难题的存在，AI在实际运行中常表现 研究。从心理学视角出发去理解人类的价值构建以
+出多种类型的对齐失败行为，主要包括：（1）权利 及道德决策过程，不仅有助于设计出内在机制更符
+寻求—有些AI系统可能表现出试图控制资源和人 合人类价值观的AI系统架构，同时能增强AI行为
+类的行为，然后运用这种控制来实现其指定的目标 的可解释性。本节总结了心理学理论对于AI价值
+（Carlsmith, 2022）；（2）虚假信息—有些大语言 观对齐的一些代表性启发，并探讨了将心理学研究
+模型会无意或故意产生与事实不符的输出，被称为 结合到AI价值观对齐工作中的可能性。
+晋少雄等:由“心”及“智”：心理学研究促进AI价值观对齐的路径探讨 785
+3.1 心理学理论对AI价值观对齐的启示 强的模型性能。
+要实现AI系统在价值层面的对齐，首先需理解 （3）文化的影响
+人类价值系统的形成与运作机制。心理学为我们提 价值观高度依赖于文化背景。跨文化研究显
+供了两类关键理论依据：一是价值观的构成机制， 示，人类价值系统既有有普遍结构，也体现出文
+即人类如何在社会化与认知发展过程中逐步建立起 化差异。例如，Schwartz（2012）的基本人类价值
+对“什么是重要的”与“应当如何行动”的稳定偏好； 理论提出了十项普遍的价值维度，这些维度在不同
+二是道德判断的心理机制，即人类个体在面对伦理 文化中也表现出稳定性。这启发我们在进行AI价
+冲突时如何进行价值选择与决策。 值观对齐设计时，无论其内生奖励机制如何构建，
+前者有助于理解AI应如何“习得”类人的价值 都应辅以符合人类普世价值观的底层符号规则，以
+目标，后者聚焦于AI怎样有效“运用”价值观做出 形成基本行为约束。Haidt（2012）的道德基础理论
+符合人类价值观的行为决策，二者相辅相成。因此， 则认为，道德判断是由进化产生的几个核心道德基
+本节将从这两个方面出发，探讨心理学理论能为AI 础模块驱动的，但在不同文化中，基础模块的优先
+价值观对齐带来哪些启发。 级与表达形式存在显著差异。这说明在AI价值观
+3.1.1 价值观的构成 对齐中不存在一种唯一正确且通用的法则，AI价值
+心理学研究指出，人类个体价值观是在成长中 观对齐的错误泛化问题可能不仅是技术性的问题。
+逐渐内化的，受家庭、教育与社会环境等影响形成 不同AI系统价值观对齐的目标应该与其应用环境
+的稳定偏好（Grusec & Hastings, 2006）。可以从三 以及社会背景相结合，设计出与其核心职能相符合
+个层面来理解人类的价值构成： 的价值观对齐规则。
+（1）社会化过程 此外，在现有技术手段的辅助下，有望建构出
+价值观的最初来源通常是社会化过程，包括家 维度化、跨文化的道德认知空间。例如Cheng等人
+庭教育、学校规范、同伴互动与社会制度的灌输。 （2025）在研究中通过语料分析、结构建模等方法
+在个体成长过程中，行为被奖励或惩罚的结果逐渐 揭示了人类人际关系的通用结构。类比来看，如果
+塑造了对“好”与“坏”的内化标准。Bandura等 能借助大数据和机器学习方法，将多种来源的道德
+人（1977）的社会学习理论指出，个体通过观察他 信息整合处理，有望构建出一个通用道德认知的模
+人行为及其结果，习得相应的价值倾向。AI价值观 型。将道德认知空间建模为若干维度，能给AI带
+对齐中强化学习方法的核心思路与之相吻合，通过 来一个清晰、可解释、可学习的“目标空间”，从
+结果的反馈塑造AI价值标准。 而更有可能进行有效的价值观对齐。
+（2）认知发展 AI价值观的构成只是价值观对齐的一部分，
+发展心理学强调，价值观随认知能力的发展而 另一个关键问题在于：当面对道德冲突与伦理抉择
+逐渐复杂化。皮亚杰与科尔伯格的道德发展阶段理 时，AI该如何做出与人类相符的判断？这就需要进
+论指出，儿童最初的道德判断基于对惩罚与奖励的 一步考察人类在实际道德决策中的心理加工机制。
+反应，随后逐步发展为理解社会契约与普遍伦理原 3.1.2 道德判断
+则的能力（Piaget, 2013）。这说明人类价值观的建 道德判断是人类行为调节与社会互动的核心机
+构性特征：并非被动接受，而是主动构建生成。AI 制，理解其心理过程对AI价值观对齐具有重要启
+价值观对齐中的协作逆向强化学习就是源于这一思 发意义。
+路，想让AI通过与人的互动自主构建奖励机制。 “ 双 系 统 理 论”（dual-process theory） 由
+但正如儿童价值观建构有时候取决于自身总结能力， Greene等人（2007）提出，认为人类道德决策由两
+通过这种方法进行AI价值观对齐可能会因为AI模 个系统共同驱动：系统一为快速、隐性、情绪驱动
+型对环境敏感性的差异导致其形成不一样的价值观， 的道德直觉系统，系统二则为缓慢、显性、基于规
+因此，要想让模型道德能力发展得更好需依赖于更 则的道德推理系统。这种双重加工机制对AI设计具
+786 心 理 科 学
+有重要启示：当前多数AI价值观对齐仅模拟系统 更需设计能够识别不同社会情境、灵活调整判断路
+二的逻辑推理过程，而忽视了系统一中的感性评估 径的情境整合模块。这种多维度、具备上下文适应
+机制，这可能导致AI做出“合理但不合情”的选择， 能力的机制，才能增强AI在复杂社会交互中的可
+进而展现出与人类行为的偏差。 靠性与人类认同感。
+然而随着道德心理学的发展，学界对于“双系 综上所述，心理学关于人类价值观构成与道德
+统理论”也提出了许多批判。一方面，“双系统理 判断机制的研究，为AI价值观对齐提供了丰富的
+论”将“义务论判断”与直觉系统、“功利主义判 理论启示。然而，要将这些理论真正转化为可执行
+断”与推理系统机械对应的说法遭到质疑。实证研 的系统设计方案，还需进一步分析心理学机制在具
+究表明，功利主义判断并非总是推理系统的产物， 体价值导向行为上的实现路径。
+例如Bago和De Neys（2019）在快速反应的认知负 3.2 心理学促进AI价值观对齐的实现路径
+荷实验中发现，大量被试在极短的时间内也能做出 本节将探讨心理学在各个层面对AI价值观对齐
+功利主义决策。另一方面，研究者指出该理论主要 的贡献路径。具体而言，首先阐明心理学对人类道
+聚焦于少数经典道德困境场景的讨论（如天桥问 德直觉与行为的刻画如何为“AI系统究竟应与何种
+题、电车难题等），并没有对道德判断中的动机 伦理价值进行对齐”这一关键问题提供理论依据；
+归因、社会情境理解、社会规范内化等情况进行 随后，以“利他行为”为代表，分析心理学在AI动
+深入考虑（Kahane, 2012）。来自认知神经科学的研 机生成、认知能力构建与社会演化方面的机制性指
+究也表明道德判断不是由单一脑区或两个系统分别 导作用。
+处理，而是由多个脑区协同参与的神经网络动态调 3.2.1 心理学对AI价值观对齐目标的反馈作用
+控的结果。例如，FeldmanHall等人（2013）发现， AI价值观对齐的一个根本的问题在于：AI系
+在处理复杂道德决策时，与社会认知相关的颞顶联 统应当对齐何种类型的价值观？目前越来越多研究
+合区（temporo-parietal junction, TPJ）活动增强，而 者意识到，“What to align with”并非一个可由设计
+腹内侧前额叶皮层（ventromedial prefrontal cortex, 者或专家单方面决定的先验问题，回答这一问题需
+vmPFC）活动则减少。前者是社会认知的重要脑区， 要经过动态的、社会性的协商和验证（Awad et al.,
+而后者则与情绪整合密切相关。这些研究结果表明， 2022）。
+人类的道德判断具有多维结构，不仅涉及认知推理 因此，学界提出了“描述性伦理价值”（descriptive
+与情绪加工，还整合了社会情境信息。 ethical values）——是否可以通过观察、归纳与建模
+除了“双系统理论”外，也有学者从不同视角 人类真实的道德偏好，反向推理出值得对齐的伦理
+解析了道德判断的心理机制。例如Schein 和 Gray 价值？心理学为这一过程提供了实证性的解读。人
+（2018）提出的“二元道德理论”（theory of dyadic 类的道德判断并非抽象规则计算的结果，而是由情
+morality），该理论认为一切道德判断都可归结为“加 绪直觉、社会规范、经验学习等多种机制共同作用
+害者-受害者”结构的感知，强调“伤害识别”与“意 的产物（Bonnefon et al., 2024）。这些判断在不同文
+图归因”在道德判断机制中的地位。这种以“伤害 化与情境中既表现出一定的一致性，也存在显著的
+感知”为核心的模型更贴近人类在真实社会交互中 差异性。例如“Moral Machine”实验采集了200多
+的道德心理结构，也为AI道德推理的情境建模提 个国家被试在自动驾驶情境中的道德判断结果，揭
+供了新的方向。 示了人类道德偏好存在的共识与文化差异（Awad et
+上述研究结果都为AI价值观对齐提供了重要启 al., 2018）。正因如此，心理学研究可以作为一种经
+示。目前多数AI系统仅模拟基于规则的逻辑推理 验反馈机制，不断校准我们关于人类价值观的认知。
+过程，忽视了人类决策中情绪评估与情境敏感性的 值得注意的是，心理学研究提供的只是对“人
+重要作用。若希望AI更接近人类价值判断方式， 类现实偏好”的理解，而不能替代伦理学对价值正
+应当不仅在架构上整合系统一与系统二的加工机制， 当性的规范讨论。不过，这种“经验-规范”双重
+晋少雄等:由“心”及“智”：心理学研究促进AI价值观对齐的路径探讨 787
+视角的融合，正是当前AI伦理设计的重要趋势。 其中，情绪共鸣（emotional empathy）被认
+心理学不仅能够识别出人们普遍重视的价值，还能 为是激发直接利他行为的核心驱动之一。Batson
+揭示在特定决策环境中哪些价值最容易被边缘化或 （2011）提出“共鸣-利他假说”（empathy-altruism
+扭曲，从而为设计具备社会适应性的AI对齐目标 hypothesis），认为当个体体验到对他人痛苦的共情
+提供反馈。 情绪时，会产生一种内在动机去帮助他人，以缓解
+3.2.2 心理学对AI价值观对齐机制的指导作用:以 自身的情绪不适。这种非功利性动因基于情绪而非
+利他行为机制为例 理性计算，是无条件亲社会行为的重要心理学基础。
+利他行为（altruism）作为人类社会价值的典型 为在AI中模拟这一机制，Zhang等人（2023）提
+体现，长期以来是伦理学、社会心理学与认知科学 出一种脑启发建模方法，在脉冲神经网络（spiking
+等领域的研究重点。如何让AI系统展现出近似人 neural network, SNN）架构中构建“情绪响应路径”。
+类的利他倾向也是AI价值观对齐的核心问题之一。 在该模型中，研究者模拟了人脑边缘系统（如杏仁
+之所以聚焦于利他行为，主要基于以下三点考虑： 核）对社会性刺激的即时响应，使AI在感知他人
+其一，利他行为是人类价值观体系中的核心组成， 情绪时生成类人“感性动因”，从而增强其亲社会
+体现了个体在无外部激励下自愿为他人利益做出牺 行为的自然性。将“情绪共鸣”机制引入AI，不仅
+牲的能力，这种行为是AI伦理设计中非常能体现“价 可以扩展其动机结构，还可能在缺乏外部奖励的道
+值观对齐水平”的指标之一；其二，利他行为的心 德困境中提供“非功利性”的亲社会决策基础，有
+理学研究范围涵盖了价值观形成（如社会规范内化）、 助于构建更可信赖、内驱稳定的道德行为模式。
+道德判断（如情绪直觉与推理交互）以及社会环境 （2）认知能力层面：赋予AI“心理理论”与
+反馈（如规范惩罚与群体合作演化）等多个维度， 自我想象能力
+能够较好地展现不同维度的心理学机制在AI对齐中 根据“心理理论”（theory of mind）观点，人
+的应用；其三，利他行为在心理学、神经科学与计 类进行利他行为的一个重要前提是能够理解他人的
+算建模中已有丰富的研究结果积累，且在AI领域已 情绪与意图，形成“对他人心智状态的模拟”。这
+有关于如何实现AI利他行为的研究作为现实参考。 一能力使个体可以预测他人需求，并在缺乏明确奖
+因此，本节将从利他行为的动机机制、认知能 励的情况下主动做出亲社会选择。发展心理学研究
+力机制与社会行为演化机制三个层面，探讨如何在 指出，儿童在发展出心理理论能力后，其利他行为
+AI中引入类人的利他行为生成机制，并展示心理学 与社会判断能力显著提升（Wellman, 2014）。通过
+理论在这一过程中的指导作用。 推断他人情绪状态与心理需求，个体更容易在社会
+（1）动机机制层面：构建类人的多重驱动系统 互动中展现出体贴、援助等亲社会行为。据此观
+传统AI系统在设计过程中常把利他行为机制简 点Tong等人（2024）提出，通过自我想象（self-
+化为计算社会效用最大化的输出，主要依赖外部设 imagination）和类“心理理论”建模，AI能够在缺
+定的奖励函数。然而，心理学研究表明，人类利他 乏明确外部激励的情境中，自发产生利他行为。
+行为背后存在复杂的心理与神经机制，并非可以用 在AI系统中赋予“心理理论”能力，不仅有助
+简单奖励结构还原。Wu等人（2024）提出“动机 于提升其在多智能体互动中的行为适应性，更使其
+鸡尾酒”计算模型，指出人类的利他行为收到情绪 能够在道德决策中考虑“他人视角”与“预期影响”，
+共鸣（emotional empathy）、内在道德信念（moral 从而避免行为上的冷漠和局限性。
+belief）、名誉管理（reputation concern）、预期互惠 （3）社会行为演化层面：在动态环境中形成稳
+（expected reciprocity）等多重动因驱动，不同情境 定的亲社会倾向
+下的利他决策由多重动因动态调控。这提示我们： 除了内在动因与认知机制外，心理学研究还强
+在AI系统中应构建类似的多元内驱结构，避免将 调社会环境对利他行为的塑造作用。研究表明人类
+道德行为归因于单一动因或外部奖惩。 的亲社会倾向并非总是稳定的，而是在特定社会互
+
+
+=== 面向多模态大语言模型的人类偏好对齐研究_杨云淏.pdf ===
+电 子 科 技 大 学
+UNIVERSITYOF ELECTRONIC SCIENCE AND TECHNOLOGY OF CHINA
+专业学位硕士学位论文
+MASTER THESIS FOR PROFESSIONAL DEGREE
+论文题目 面向多模态大语言模型的
+人类偏好对齐研究
+专业学位类别 电子信息
+学 号 202222080122
+作者姓名 杨云淏
+指导教师 沈复民 教 授
+学 院 计算机科学与工程学院
+（网络空间安全学院）
+分类号 TP37 密级 公开
+UDC注1 004.8
+学 位 论 文
+面向多模态大语言模型的
+人类偏好对齐研究
+（题名和副题名）
+杨云淏
+（作者姓名）
+沈复民 教授
+指导教师
+电子科技大学 成都
+（姓名、职称、单位名称）
+申请学位级别 硕士 专业学位类别 电子信息
+专业学位领域 计算机技术
+提交论文日期 2025 年 3 月 20 日 论文答辩日期 2025 年 5 月 20 日
+学位授予单位和日期 电子科技大学 2025 年 6 月
+答辩委员会主席
+评阅人
+注1：注明《国际十进分类法UDC》的类号。
+The Study of Human Preference Alignment for
+Multimodal Large Language Models
+A Master Thesis Submitted to
+University of Electronic Science and Technology of China
+Discipline Electronic Information
+Student ID 202222080122
+Author Yang Yunhao
+Supervisor Prof. Shen Fumin
+School School of Computer Science and Engineering
+(School of Cyberspace Security)
+摘要
+摘 要
+多模态大语言模型（MLLM）能够根据用户提供的文本指令及视觉输入，以
+零样本或少样本的推理方式灵活地完成各类视觉语言任务，为实现通用人工智能
+提供了一条可行的路径。然而，这些模型在实际应用中仍面临显著挑战，其中最
+为关键的就是幻觉问题。具体而言，模型在生成过程中可能产生看似合理，但实
+际与输入图像不一致的内容，这种不可靠的输出严重制约了模型的实际应用价值。
+已经有很多研究针对幻觉缓解进行展开，提出的方法可以分为四类：模型结构优
+化、训练时优化、推理时干预及输出后处理。这些方法虽然有效，但仍存在以下
+问题：（1）对于训练时优化的方法，现有的方法都需要使用人工或专家模型来标
+注高质量的训练数据，成本很高。且由于多模态大语言模型视觉模块的能力是有
+限的，强制其拟合到完美的标注响应可能会带来额外的幻觉。（2）对于推理时干
+预的方法，现有的方法没有充分地缓解模型对视觉和文本注意力的不平衡问题。
+针对当前多模态大语言模型幻觉缓解方法的局限性，本文展开了深入研究，
+并提出了两种幻觉缓解方法，分别通过偏好训练和推理干预对模型幻觉进行改善。
+首先，本文提出了一种自动化的偏好数据构建方法。该方法通过对输入图像施加
+噪声，激发模型对文本先验的依赖，从而引发其内部的幻觉模式，生成非首选响
+应。同时，模型的原始输出被视为首选响应，以构建成对的偏好数据。接着，生
+成的偏好数据将通过CLIP校验模块进行筛查，以提高数据质量。然后，采用直接
+偏好优化算法对模型进行训练，通过学习不同响应间细粒度的幻觉差异，使模型
+能够避免生成幻觉内容，而不仅仅是简单地拟合完美的标注响应。随后，本文将
+偏好学习中首选响应与非首选响应间“对比”的思路扩展到模型推理阶段，提出
+了一种以图像为中心的对比解码方法，用以平衡多模态大语言模型对视觉和文本
+信息的关注。具体来说，该方法通过干预模型对视觉标记的注意力权重来构建视
+觉强化分布，同时通过扰动输入图像来构建语言强化分布。然后，通过联合对比
+解码调整模型的原始输出分布，在增强视觉信息的同时减轻文本偏差，将模型引
+导向更基于图像的可靠方向。广泛的实验结果表明，本文提出的方法具有良好的
+幻觉缓解能力。
+关键词：多模态大语言模型，幻觉缓解，偏好学习，对比解码
+I
+ABSTRACT
+ABSTRACT
+Multimodal large language models can flexibly complete various vision-language
+tasksthroughzero-shotorfew-shotreasoningbasedontextualinstructionsandvisualin-
+puts provided by users, offering a promising pathway toward achieving artificial general
+intelligence. However, these models still face significant challenges in practical applica-
+tions, with the hallucination problem being one of the most critical. Specifically, during
+thegenerationprocess,themodelmayproducecontentthatseemsreasonablebutisincon-
+sistent with the input image. This unreliable output severely limits the practical value of
+themodel. Agreatdealofresearchhasbeenconductedtoaddresshallucinations,andthe
+proposedmethodscanbecategorizedintothreetypes: optimizationduringtraining,inter-
+vention during inference, and post-output processing. While these methods are effective,
+theystillhavethefollowingissues: (1)Fortraining-basedoptimizationmethods,existing
+approachesrequiretheuseofmanuallyorexpert-labeledhigh-qualitytrainingdata,which
+iscostly. Moreover,becausethevision moduleofmultimodallargelanguagemodelshas
+limitations,forcingthemodeltoperfectlyfitthelabeledresponsesmayleadtoadditional
+hallucinations. (2) For inference-based intervention methods, current approaches do not
+fullyalleviatetheimbalanceinthemodel’sattentiontovisualandtextualinformation.
+Toaddressthelimitationsofcurrenthallucinationmitigationmethodsinmultimodal
+large language models, this thesis conducts in-depth research and proposes two halluci-
+nationmitigationmethods,whichimprovemodelhallucinationsthroughpreferencetrain-
+ing and inference intervention. First, this thesis introduces an automated preference data
+construction method, which applies noise to the input image, triggering the model’s re-
+lianceontextualpriorsandinducingitsinternalhallucinationpatterns,therebygenerating
+non-preferred responses, while the model’s original output is considered as the preferred
+response to construct paired preference data. Secondly, the generated preference data is
+screened by the CLIP verification module to improve its quality. Finally, a direct prefer-
+ence optimization algorithm is used to train the model, enabling it to learn fine-grained
+hallucination differences between responses and avoid generating hallucinated content,
+rather than simply fitting to perfect labeled responses. Next, the thesis applies the idea
+of”contrast”betweenpreferredandnon-preferredresponsesinpreferencelearningtothe
+model’s inference process, proposing an image-centered contrastive decoding method to
+II
+ABSTRACT
+balancetheattentionofmultimodallargelanguagemodelsonvisualandtextualinforma-
+tion. Specifically, this method constructs a visually enhanced distribution by intervening
+in the attention values of visual tokens, while constructing a linguistically enhanced dis-
+tribution by perturbing the input image. Finally, by jointly decoding with contrast, the
+model’s original output distribution is modified to enhance visual information while re-
+ducingtextualbias,guidingthemodeltowardamoreimage-basedandreliabledirection.
+Extensiveexperimentalresultsshowthattheproposedmethodhasgoodhallucinationmit-
+igationcapability.
+Keywords: Multimodal Large Language Models, Hallucination Mitigation, Preference
+Learning,ContrastiveDecoding
+III
+
+

@@ -36,3 +36,9 @@ Thumbs.db
 # Derived research records must not be accidentally published.
 Runs/**/*.parquet
 Runs/**/ambiguous_sessions.csv
+
+# Archived data retain publication restrictions after relocation.
+/Legacy/Data/
+/Legacy/Runs/**/*.parquet
+/Legacy/Runs/**/ambiguous_sessions.csv
+/Legacy/tmp/

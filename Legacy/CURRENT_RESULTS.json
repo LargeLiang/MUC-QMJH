@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "run": "Runs/final-v3",
+  "analysis_entry": "Codes/reproduce.py",
+  "scope": "observational_associations",
+  "acceptance": "computationally_verified_research_limitations_open",
+  "formal_document_status": "awaiting_user_confirmation",
+  "historical_roots": ["Reports", "Tables", "Pictures", "END"],
+  "superseded_runs": ["Runs/rebuild-v1", "Runs/rebuild-v2"]
+}

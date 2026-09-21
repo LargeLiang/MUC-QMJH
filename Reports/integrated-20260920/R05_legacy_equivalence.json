@@ -1,0 +1,75 @@
+{
+  "baseline": "E:\\Files\\Repository\\MUC-QMJH\\Legacy\\Runs\\final-v3",
+  "status": "passed",
+  "csv_tolerance": {
+    "rtol": 1e-12,
+    "atol": 1e-12
+  },
+  "checks": [
+    {
+      "artifact": "analysis_data.parquet",
+      "byte_identical": true,
+      "numeric_match": true
+    },
+    {
+      "artifact": "ambiguous_sessions.csv",
+      "byte_identical": true,
+      "numeric_match": true
+    },
+    {
+      "artifact": "inputs.json",
+      "byte_identical": true,
+      "numeric_match": true
+    },
+    {
+      "artifact": "attrition.csv",
+      "byte_identical": true,
+      "numeric_match": true
+    },
+    {
+      "artifact": "language_outcomes.csv",
+      "byte_identical": true,
+      "numeric_match": true
+    },
+    {
+      "artifact": "paired_tests.csv",
+      "byte_identical": true,
+      "numeric_match": true
+    },
+    {
+      "artifact": "adjusted_associations.csv",
+      "byte_identical": true,
+      "numeric_match": true
+    },
+    {
+      "artifact": "scaling_full.csv",
+      "byte_identical": true,
+      "numeric_match": true
+    },
+    {
+      "artifact": "model_full_all_terms.csv",
+      "byte_identical": true,
+      "numeric_match": true
+    },
+    {
+      "artifact": "scaling_english.csv",
+      "byte_identical": true,
+      "numeric_match": true
+    },
+    {
+      "artifact": "model_english_all_terms.csv",
+      "byte_identical": true,
+      "numeric_match": true
+    },
+    {
+      "artifact": "scaling_single_turn.csv",
+      "byte_identical": true,
+      "numeric_match": true
+    },
+    {
+      "artifact": "model_single_turn_all_terms.csv",
+      "byte_identical": true,
+      "numeric_match": true
+    }
+  ]
+}

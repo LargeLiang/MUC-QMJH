@@ -9,7 +9,7 @@ https://creativecommons.org/licenses/by/4.0/
 This notice applies to self-authored textual materials such as:
 
 - README.md
-- References/
+- Legacy/References/
 - CONTRIBUTING.md
 - SECURITY.md
 - CODE_OF_CONDUCT.md

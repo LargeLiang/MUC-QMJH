@@ -2,7 +2,14 @@
 
 All notable changes to this repository will be documented in this file.
 
-## [Unreleased] - 2026-09-12
+## [Unreleased] - 2026-09-20
+
+- 旧工程、缓存、图表、运行和 END 结项材料迁至 Legacy，保留最近的未提交修改；原始数据与论文工作稿保持原位。
+- 当前工程整合为 Codes/C00–C06，恢复 Data、Reports、Tables、Pictures 分运行产出与 C/R/T/P 编号约定。
+- 从七片原始数据完成整合试运行，13 项数据/统计产物与归档 final-v3 字节一致。
+- 加入输出保护、依赖校验、输入/源码/产物哈希追踪、报告图形和当前入口测试；统计局限及论文修订仍待后续。
+
+## [Previous working-tree changes] - 2026-09-12
 
 - 新增 CURRENT_RESULTS.json、只读完整性校验与新旧成果逐项对应清单。
 - 默认分析入口统一为 reproduce.py；旧 C01–C23 仅显式允许后执行，新 notebook 默认只读验证。

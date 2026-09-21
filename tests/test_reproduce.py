@@ -3,7 +3,9 @@ import unittest
 from pathlib import Path
 import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'Codes'))
-from reproduce import paired, extract, CRITERIA
+from C02_paired_tests import paired
+from C01_prepare_data import extract
+from accessor import CRITERIA
 
 
 class PairedTests(unittest.TestCase):

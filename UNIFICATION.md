@@ -1,35 +1,20 @@
-# 新旧成果统一清单
+# 新旧成果对应与当前权威
 
-唯一当前结果指针为 `CURRENT_RESULTS.json`。当前使用 `Runs/final-v3`，这是已完成计算校验、但尚有研究限制的观察性分析，不代表论文已经完成验收。
+唯一当前结果由 CURRENT_RESULTS.json 指定。2026-09-20 整合后，当前入口为 Codes/C00_run_all.py，不再是 reproduce.py；所有旧入口已移入 Legacy。
 
-|成果类别|历史位置|当前对应|处理决定|
-|---|---|---|---|
-|分析入口|Codes/C01–C23|Codes/reproduce.py|旧入口默认停用；显式允许才可历史复核|
-|交互入口|Codes/C00_all_collection.ipynb|Codes/current_analysis.ipynb|旧 notebook 保留并标记；新 notebook 调用唯一入口|
-|整合及清洗数据|Data/integrated_data、optimized_data、subsets|Runs/final-v3/analysis_data.parquet|不搬动旧缓存；新链不读取它们|
-|样本清洗报告|Reports/R01–R10|Runs/final-v3/attrition.csv、inputs.json|新旧保留；不互换样本口径|
-|长度与格式检验|Tables/T01–T04、Reports/R11–R14|Runs/final-v3/paired_tests.csv|以新检验为准；旧分箱和图没有声称已重建|
-|调整后关联|Tables/T05–T06|Runs/final-v3/adjusted_associations.csv|模型与尺度不同，不将新 OR 当旧 OR 的直接替换|
-|IPW 与匹配|Tables/T07–T10|无有效替代推断|撤回旧推断，非重新验证通过|
-|SEM|Tables/T11–T15|无有效替代推断|撤回旧机制解释|
-|论文图表|Pictures、Tables/paper_ready|待生成新版|全部旧图表仍为历史，不用于新提交|
-|结题正文与答辩|END|等待确认正式主版本及另存方案|原件保留，未擅自改写正式材料|
-|方法教学材料|References|历史学习资料|不作为当前研究已经执行的步骤证明|
-|运行结果|Runs/rebuild-v1、rebuild-v2|Runs/final-v3|前者失败或已被替代，不作为默认结果|
+| 类别 | 归档位置 | 当前位置/处理 |
+| --- | --- | --- |
+| 旧 C01–C23、旧 Notebook、旧 reproduce.py | Legacy/Codes | Codes/C00–C06 与新 C00 Notebook |
+| 旧格式、长度、整合、清洗、子集缓存 | Legacy/Data | 重新从活动原始分片构建 Data/analysis_data/运行编号 |
+| 旧图、报告和统计表 | Legacy/Pictures、Reports、Tables | 新结果只写 Pictures、Reports、Tables/运行编号 |
+| final-v3 等旧运行及 5,000 次 Bootstrap 运行 | Legacy/Runs | 当前结果由根目录指针选取；旧 SEM 仅历史 |
+| END 校内创新项目结项文件 | Legacy/END | 原件归档，不当成论文主版本 |
+| 方法材料、旧归档、临时脚本和旧测试 | Legacy/References、Archive、tmp、tests 等 | 当前文档在根目录，当前测试在 tests |
+| 上游原始分片 | 未搬动 | Data/lmarena-aiarena-human-preference-140k |
+| “基于……”论文工作稿 | 未搬动、未修改正文 | 留在根目录原子目录，尚需依据新结果修订 |
 
-## 本轮不改变的内容
+迁移保留了用户最近对旧 Notebook、SEM 代码、结构图和 Bootstrap 产物的修改。旧文件原文里的相对路径和“当前”措辞保留历史语境，不再视为活动指令。Legacy 不是无需配置即可直接运行的独立快照：原始数据仍在活动工程，旧环境及路径也可能需要单独配置。
 
-本轮是工程及成果身份统一，不改动 `Codes/reproduce.py`、原始数据、final-v3 产物或统计规格。时间分层、提示聚类、异常计数校验等审计建议仍未实施，不能写作已修复。旧报告本身保留原文，历史标记不表示其结论有效。
+当前统计规格与 final-v3 完全相同；本次 13 项可比数据/统计文件字节一致。原先撤回的匹配/IPW/SEM 因果解释没有因迁移而恢复有效。新版编号是职责编号，不能用同号机械替代历史表格。
 
-## 已知口径差异
-
-- 旧明确胜负样本 78,970，新样本 78,959；旧清洗总量 108,171，新总量 108,154。
-- 新 62.37% 的分母是长度不相等的 78,772 对；旧 62.21% 使用含等长配对的分母，不能直接解读为偏好增强。
-- 新长度变量为标准化 log token 比，旧模型采用不同特征与控制；OR 的差异并不等于研究效应随修复变大。
-- 新秩二列相关修正为 0.3278；标题在英语和单轮敏感性分析中不稳定，不能统一成“格式稳定有效”。
-
-## 验收与后续
-
-运行 `python Codes/verify_current.py --raw` 验证当前输入、源代码和产物；公开仓库缺少派生记录时使用 `--public-only`，此模式不是完整数据验收。运行 `python -m unittest discover -s tests -v` 检查基础统计与统一入口约束。
-
-本轮尚待用户确认：以 END/结题报告.docx 为正式材料主版本，另存新稿，统一为观察性关联叙述。没有用户确认前不覆盖、删除或发布正式论文。
+论文工作稿未覆盖，旧研究结果与新分析口径仍需逐项转换。END 已明确归为结项材料，论文目录才是继续写作的工作位置。

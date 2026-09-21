@@ -1,38 +1,59 @@
-# MUC-QMJH 人类偏好关联研究
+# MUC-QMJH：大语言模型输出特征与人类选择偏好
 
-当前分析研究回答长度、标题、列表和加粗特征与人类比较结果的观察性关联。模型调整不等同于控制回答真实质量，也不支持纯因果效应或机制已证实的表述。
+当前工程研究回答长度、格式特征与配对胜负的**观察性关联**，不将其解释为因果效应或机制。
 
-## 当前状态
+当前结果由 [CURRENT_RESULTS.json](CURRENT_RESULTS.json) 唯一指定。2026-09-20 已从全部 7 个原始分片完成整合试运行：135,634 条输入、108,154 条保留记录、78,959 对明确胜负。13 项可比产物与归档 final-v3 的 SHA-256 全部一致。
 
-- 唯一结果指针：[CURRENT_RESULTS.json](CURRENT_RESULTS.json)，当前指向 Runs/final-v3。
-- 计算与哈希已验证；数据校验、时间与提示依赖敏感性等研究限制仍待处理。
-- 正式 Word、旧论文图表尚未同步，不能将历史材料直接作为新版提交。
-- 新旧文件逐项对应及待确认事项见 [统一清单](UNIFICATION.md)。
+## 工程组织
 
-## 使用入口
+| 位置 | 用途 |
+| --- | --- |
+| Codes/C00_run_all.py | 完整运行入口，统一调度 C01–C06 |
+| Codes/C00_all_collection.ipynb | 无历史输出的交互入口，默认只校验 |
+| Codes/C01_prepare_data.py | 从全部原始分片重建样本 |
+| Codes/C02_paired_tests.py | 配对检验及 Holm 校正 |
+| Codes/C03_adjusted_associations.py | 调整后的关联及敏感性分析 |
+| Codes/C04_export_results.py | Markdown 报告和 Pxx 图 |
+| Codes/C05_verify_results.py | 源码、输入与产物完整性校验 |
+| Codes/C06_compare_legacy.py | 可选的归档基线等价性校验，由 C00 调用 |
+| Data/lmarena-aiarena-human-preference-140k | 保留原位置的上游原始数据 |
+| Data/analysis_data/运行编号 | 当前派生数据，不公开提交 |
+| Reports/运行编号 | Rxx 输入记录、运行清单、报告和对照 |
+| Tables/运行编号 | Txx 统计表 |
+| Pictures/运行编号 | Pxx 图片 |
+| Legacy | 所有旧工程、旧缓存、旧图表、旧运行及 END 结项材料 |
+| 基于大语言模型输出文本的选择偏好研究 | 仍保留的论文工作稿；未自动替换旧结果 |
 
-使用 Python 3.13.5，在项目根目录执行：
+Cxx/Rxx/Txx/Pxx 命名传统保留；编号不表示与 Legacy 中同号文件的统计含义相同。每次运行独立分目录，禁止覆盖。
+
+## 快速使用
+
+建议 CPython 3.13.5，先安装锁定依赖：
 
 ```powershell
 python -m pip install -r requirements-analysis.lock.txt
 python -m unittest discover -s tests -v
-python Codes/verify_current.py --raw
-python Codes/reproduce.py --output Runs/my-new-run
+python Codes/C05_verify_results.py --verify-raw
 ```
 
-最后一条命令执行全量重跑；输出目录必须不存在。新运行不会自动成为正式当前结果，应经审阅后更新结果指针。科学复现需要本地七个原始分片，位置及方法边界见 [复现说明](REPRODUCIBILITY.md)。Notebook 用户使用 [current_analysis.ipynb](Codes/current_analysis.ipynb)。
+从原始分片重新运行（自动创建唯一运行编号，不默认改当前指针）：
 
-## 阅读成果
+```powershell
+python Codes/C00_run_all.py
+```
 
-1. [当前结果摘要](RESULTS_REBUILT.md)：样本、调整关联与研究限制。
-2. [运行报告](Runs/final-v3/REPORT.md)：原始运行报告，只读保留。
-3. [配对检验](Runs/final-v3/paired_tests.csv)和[调整后关联](Runs/final-v3/adjusted_associations.csv)：完整精度结果。
-4. [统一清单](UNIFICATION.md)：历史成果与新版对应关系。
+显式命名、对照归档并在验证成功后更新当前指针：
 
-不在首页手工复制统计数值，以减少多份结果漂移。历史 C01–C23 默认禁止直接执行；仅供有意识的历史审查。Reports、Tables、Pictures、END 中原有文件不属于当前提交成果。旧首页等原件保存在 Archive/pre-unification-20260912。
+```powershell
+python Codes/C00_run_all.py --run-id my-new-run --compare-legacy Legacy/Runs/final-v3 --promote
+```
 
-## 数据与许可
+不要复用已有运行编号。对照基线属于可选迁移验收，不是新流程运行依赖。缺少本地原始/派生数据时，可使用 `python Codes/C05_verify_results.py --public-only` 仅校验公开产物；这不等于完整复现。
 
-原始数据不随代码自动再分发。参见 [许可边界](LICENSE_POLICY.md)、[代码许可](LICENSE)、[文档许可](LICENSE-docs.md)。作者和正式引用信息见 [CITATION.cff](CITATION.cff)，其中版本仍为已发布历史版本，不将工作区改动虚构成已发布版本。
+详见 [复现说明](REPRODUCIBILITY.md)、[新旧对应](UNIFICATION.md)、[当前结果摘要](RESULTS_REBUILT.md) 和 [迁移记录](MIGRATION.md)。
 
-协作要求见 [CONTRIBUTING.md](CONTRIBUTING.md)。本工程尚未完成论文统一与研究验收。
+## 研究边界
+
+重复提示词/用户的相关性、时间漂移、独立回答质量测量缺失、平局选择及细小子组不稳定仍需进一步研究。本次为工程整合和等价性验证，不是全部统计审计问题的修复，也不意味着论文已达到投稿验收标准。旧匹配、IPW、SEM 结果保留供审计，不作为当前推断证据。
+
+代码及文档授权见 LICENSE、LICENSE-docs.md；原始数据、派生数据及第三方材料另遵循上游许可，迁入 Legacy 不改变权利边界。

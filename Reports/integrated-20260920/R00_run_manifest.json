@@ -1,0 +1,129 @@
+{
+  "schema_version": 2,
+  "run_id": "integrated-20260920",
+  "status": "complete",
+  "started": "2026-09-20T13:34:00.265812+00:00",
+  "python": "3.13.5 (tags/v3.13.5:6cb20a2, Jun 11 2025, 16:15:46) [MSC v.1943 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "packages": {
+    "numpy": {
+      "expected": "2.3.5",
+      "installed": "2.3.5"
+    },
+    "pandas": {
+      "expected": "2.3.3",
+      "installed": "2.3.3"
+    },
+    "pyarrow": {
+      "expected": "21.0.0",
+      "installed": "21.0.0"
+    },
+    "scipy": {
+      "expected": "1.16.1",
+      "installed": "1.16.1"
+    },
+    "statsmodels": {
+      "expected": "0.14.6",
+      "installed": "0.14.6"
+    },
+    "patsy": {
+      "expected": "1.0.2",
+      "installed": "1.0.2"
+    },
+    "packaging": {
+      "expected": "25.0",
+      "installed": "25.0"
+    },
+    "python-dateutil": {
+      "expected": "2.9.0.post0",
+      "installed": "2.9.0.post0"
+    },
+    "pytz": {
+      "expected": "2025.2",
+      "installed": "2025.2"
+    },
+    "tzdata": {
+      "expected": "2025.2",
+      "installed": "2025.2"
+    },
+    "six": {
+      "expected": "1.17.0",
+      "installed": "1.17.0"
+    },
+    "matplotlib": {
+      "expected": "3.10.8",
+      "installed": "3.10.8"
+    },
+    "contourpy": {
+      "expected": "1.3.3",
+      "installed": "1.3.3"
+    },
+    "cycler": {
+      "expected": "0.12.1",
+      "installed": "0.12.1"
+    },
+    "fonttools": {
+      "expected": "4.61.1",
+      "installed": "4.61.1"
+    },
+    "kiwisolver": {
+      "expected": "1.4.9",
+      "installed": "1.4.9"
+    },
+    "pillow": {
+      "expected": "11.0.0",
+      "installed": "11.0.0"
+    },
+    "pyparsing": {
+      "expected": "3.2.5",
+      "installed": "3.2.5"
+    }
+  },
+  "threads": {
+    "OPENBLAS_NUM_THREADS": "2",
+    "MKL_NUM_THREADS": "2",
+    "OMP_NUM_THREADS": "2"
+  },
+  "source_sha256": {
+    "Codes/accessor.py": "32cd8ee3d1094b1092ae1ba4136ca12647fbb54927b8a00efb5dc9e212310d3e",
+    "Codes/C00_all_collection.ipynb": "e1ade5b2d9096a079ab73f998c928d369d652b30b6fc0bd0dd9eafce908daa80",
+    "Codes/C00_run_all.py": "53b05d81a691d1c400740f600421e23fd146b774e317fa5ce89c752e3f4f97d7",
+    "Codes/C01_prepare_data.py": "5310b37a5638c352136f6105fee1903fed2cf821c16a745bea61513e92ffee20",
+    "Codes/C02_paired_tests.py": "aa7ae832b0f41d75b67ce76b0493951654a27c842a0bd5ba7fb4b9fb7bd64633",
+    "Codes/C03_adjusted_associations.py": "68bf0b4bb1e5974d75670e2904db773ee88a283f0f7917f105e8bd8fd2b773ff",
+    "Codes/C04_export_results.py": "50070c721292d837e32a5e4c8aa761d29ab65c833ac026624a5c4948d22c4517",
+    "Codes/C05_verify_results.py": "b42340c40adb48d3f9b75d8beb54f677b6806ff3f7784b4a8cadb975c1847196",
+    "Codes/C06_compare_legacy.py": "4bf5923fee4bef1d9ea345f5cd870f19760c39de8bca0b1da40039100605776f",
+    "requirements-analysis.lock.txt": "db952857998a21d4d2e4cb418fedc359d9de71313774fc3d8cd08abe940e162f"
+  },
+  "counts": {
+    "retained": 108154,
+    "decisive": 78959,
+    "winners": {
+      "model_b": 39917,
+      "model_a": 39042,
+      "tie": 16574,
+      "both_bad": 12621
+    }
+  },
+  "outputs": {
+    "Data/analysis_data/integrated-20260920/analysis_data.parquet": "5fca574616ff8c4f1562e4582175d5d8a9471adaefc9aee95bed8dbfc8c05b49",
+    "Data/analysis_data/integrated-20260920/ambiguous_sessions.csv": "8ed236d40a1cb8188ce7ce46bc9885c2f4681aa348c59bec4d6dabbb4f9325af",
+    "Reports/integrated-20260920/R01_inputs.json": "d09d3c7a064e72c29283bd57465e856ccd5da6366032cb6aaea6b76ccf33920f",
+    "Reports/integrated-20260920/R04_analysis_report.md": "2414e5038bd8ba48dcf7ebeff9393408fbbc808eea3d089ab750a6eb75dc02db",
+    "Reports/integrated-20260920/R05_legacy_equivalence.json": "51ce66b7a962d5a3f22363a5b3cbecd54dde58620a74a9a1c160264df132c0ce",
+    "Tables/integrated-20260920/T01_01_attrition.csv": "ae3517a8b121f37c30dde3609e1a77c9bc05aa6ae5d43432aff07f1786b4d5eb",
+    "Tables/integrated-20260920/T01_02_language_outcomes.csv": "fe64e39e949f1bf6813712baf1cde4ad9cfcec7f2f6e6a8f2bcf278559cf5d8b",
+    "Tables/integrated-20260920/T02_paired_tests.csv": "3fcb831090b0a3c8c506a7b5cb17866c8b498e9fcae7fddb2fc269c7dafe679d",
+    "Tables/integrated-20260920/T03_adjusted_associations.csv": "e85184274709ef89ccef4cbf31dcdf23c7228c8968b34a448907d0f67af5c7d9",
+    "Pictures/integrated-20260920/P01_sample_flow.png": "76c3ad99cb6a1a1171f3ae5c9a045f9037b826702e0af4259bc36488154625e6",
+    "Pictures/integrated-20260920/P02_adjusted_associations.png": "cdcb59797c52353aeab61262bb2fa894f5c61f3646400236c6b08db8cb620987",
+    "Tables/integrated-20260920/T03_01_scaling_full.csv": "2a42098b697deaffc1f954cc6d4a62c1d0b2836ed7392fc9a36636151466ec89",
+    "Tables/integrated-20260920/T03_01_model_full_all_terms.csv": "c13d079c95f4ce87f2fcfe8130c0d9b56b0e220ecbf315fb8427857a07543321",
+    "Tables/integrated-20260920/T03_02_scaling_english.csv": "65c2cfe0b493535cbdf80abb32b902d2201488f0d7f05194bc73d472b059f226",
+    "Tables/integrated-20260920/T03_02_model_english_all_terms.csv": "2bb60606e98370f1c24273f2acfc1e9f05cbfc34cc2a9c319d197d6e0036ff9c",
+    "Tables/integrated-20260920/T03_03_scaling_single_turn.csv": "a9ce6b3f9e806f5588d61aa3b9079eb0f3bd974f7d5e68c60114ae816c096ab0",
+    "Tables/integrated-20260920/T03_03_model_single_turn_all_terms.csv": "68eea7aff0e1f6787d2ec3721a566f7aed8442416f9c34d750a0bd718fad7b2a"
+  },
+  "finished": "2026-09-20T13:34:32.212530+00:00"
+}

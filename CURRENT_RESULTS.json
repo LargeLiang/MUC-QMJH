@@ -1,10 +1,8 @@
 {
-  "schema_version": 1,
-  "run": "Runs/final-v3",
-  "analysis_entry": "Codes/reproduce.py",
-  "scope": "observational_associations",
-  "acceptance": "computationally_verified_research_limitations_open",
-  "formal_document_status": "awaiting_user_confirmation",
-  "historical_roots": ["Reports", "Tables", "Pictures", "END"],
-  "superseded_runs": ["Runs/rebuild-v1", "Runs/rebuild-v2"]
+  "schema_version": 2,
+  "run_id": "integrated-20260920",
+  "manifest": "Reports/integrated-20260920/R00_run_manifest.json",
+  "manifest_sha256": "656e60d17cf0ef7cdfb1ce84d418ebe7a94d41a75df805e57507027332ad4141",
+  "report": "Reports/integrated-20260920/R04_analysis_report.md",
+  "scope": "observational associations; archival comparisons are not causal validation"
 }

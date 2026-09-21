@@ -1,0 +1,28 @@
+{
+  "started": "2026-09-12T08:38:42.465879+00:00",
+  "python": "3.13.5 (tags/v3.13.5:6cb20a2, Jun 11 2025, 16:15:46) [MSC v.1943 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "code_sha256": "7a02ecfef145ac55f519ea8785c91627bd5b412fbdc17b8596a05639dd08c653",
+  "packages": {
+    "numpy": "2.3.5",
+    "pandas": "2.3.3",
+    "pyarrow": "21.0.0",
+    "scipy": "1.16.1",
+    "statsmodels": "0.14.6"
+  },
+  "status": "complete",
+  "outputs": {
+    "adjusted_associations.csv": "fa9625bb3f6af283543cde1cce29d5ae3e914bf585e7b9e5b1aa9542ba52b9e9",
+    "ambiguous_sessions.csv": "8ed236d40a1cb8188ce7ce46bc9885c2f4681aa348c59bec4d6dabbb4f9325af",
+    "analysis_data.parquet": "5fca574616ff8c4f1562e4582175d5d8a9471adaefc9aee95bed8dbfc8c05b49",
+    "attrition.csv": "ae3517a8b121f37c30dde3609e1a77c9bc05aa6ae5d43432aff07f1786b4d5eb",
+    "inputs.json": "d09d3c7a064e72c29283bd57465e856ccd5da6366032cb6aaea6b76ccf33920f",
+    "language_outcomes.csv": "fe64e39e949f1bf6813712baf1cde4ad9cfcec7f2f6e6a8f2bcf278559cf5d8b",
+    "model_english_all_terms.csv": "2bb60606e98370f1c24273f2acfc1e9f05cbfc34cc2a9c319d197d6e0036ff9c",
+    "model_full_all_terms.csv": "c13d079c95f4ce87f2fcfe8130c0d9b56b0e220ecbf315fb8427857a07543321",
+    "model_single_turn_all_terms.csv": "68eea7aff0e1f6787d2ec3721a566f7aed8442416f9c34d750a0bd718fad7b2a",
+    "paired_tests.csv": "3fcb831090b0a3c8c506a7b5cb17866c8b498e9fcae7fddb2fc269c7dafe679d",
+    "REPORT.md": "dd71655a43cb22bbfdc5c7d28fe9d31daa2eeb6c980733e1944210f0c337a435"
+  },
+  "finished": "2026-09-12T08:39:07.936693+00:00"
+}

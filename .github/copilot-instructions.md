@@ -3,15 +3,15 @@
 ## Current authority
 
 Read CURRENT_RESULTS.json, UNIFICATION.md and REPRODUCIBILITY.md before changing analysis or conclusions.
-The current entry is Codes/reproduce.py; current results are selected explicitly by CURRENT_RESULTS.json.
+The current entry is Codes/C00_run_all.py; current results are selected explicitly by CURRENT_RESULTS.json.
 This is observational association research, not an identified causal or mediation study.
 
 ## Preservation and migration
 
 Do not overwrite raw data, immutable run directories, historical papers or original figures.
-C01-C23 and C00_all_collection.ipynb are legacy; their estimates must not be mixed with current results.
-Legacy direct execution requires MUC_ALLOW_LEGACY=1 and may overwrite historical outputs.
-New runs need a new output directory. Do not promote a run automatically.
+All old code and outputs are under Legacy; active Codes/C00-C06 and its C00 notebook are current.
+Legacy code is archival, not an automatically runnable snapshot; do not mix its estimates with current results.
+New runs need a new run-id across Data, Reports, Tables and Pictures. Promotion requires explicit --promote.
 Formal Word/PDF changes and public release require the user's choice of canonical document and scope.
 
 ## Statistical interpretation
@@ -26,7 +26,7 @@ Known audit limitations remain open unless implemented and verified in a new run
 
 Use Python 3.13.5 and requirements-analysis.lock.txt for analysis.
 Run python -m unittest discover -s tests -v.
-Run python Codes/verify_current.py --raw when local data are available.
+Run python Codes/C05_verify_results.py --verify-raw when local data are available.
 Use --public-only only to validate public outputs; disclose skipped private files.
 Use pathlib, explicit schemas, small testable functions, clear Chinese documentation and non-overwriting outputs.
 Do not regenerate historical outputs to make them appear current.

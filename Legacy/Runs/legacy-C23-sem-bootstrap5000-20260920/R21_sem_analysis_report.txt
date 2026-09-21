@@ -1,0 +1,158 @@
+================================================================================
+结构方程模型（SEM）分析报告
+================================================================================
+
+【数据与建模口径】
+  样本量：78,970
+  数据来源：optimized_data.parquet（nested schema） + C18 loader / add_pair_features 派生的分析列
+  结果变量：winner_a（A 获胜=1，分析阶段派生列）
+  主模型中介：token_diff_ab, header_density_diff, bold_density_diff（均为分析阶段派生列）
+  扩展模型：在主模型基础上加入 list_density_diff（敏感性分析；同为派生列）
+  Bootstrap 次数：5000
+
+【层次变量摘要】
+  中介层（主模型）：3 个变量
+    - bold_density_diff: mean=0.0001, std=0.0184, median=0.0000
+    - header_density_diff: mean=-0.0000, std=0.0052, median=0.0000
+    - token_diff_ab: mean=-3.6232, std=1576.6115, median=-1.0000
+  中介层（扩展模型）：1 个变量
+    - list_density_diff: mean=-0.0000, std=0.0184, median=0.0000
+  外生层：16 个变量
+    - ability_diff: mean=-0.0005, std=0.1723, median=-0.0003
+    - code_bool: 均值/占比=0.2708, 缺失率=0.00%
+    - complexity: 均值/占比=0.4578, 缺失率=0.00%
+    - creative_writing_bool: 均值/占比=0.0836, 缺失率=0.00%
+    - creativity: 均值/占比=0.5126, 缺失率=0.00%
+    - domain_knowledge: 均值/占比=0.8110, 缺失率=0.00%
+    - format_tendency_diff: mean=0.0176, std=30.4352, median=-0.0318
+    - if_bool: 均值/占比=0.1565, 缺失率=0.00%
+    - math_bool: 均值/占比=0.0768, 缺失率=0.00%
+    - problem_solving: 均值/占比=0.6607, 缺失率=0.00%
+    - real_world: 均值/占比=0.5675, 缺失率=0.00%
+    - specificity: 均值/占比=0.5704, 缺失率=0.00%
+    - technical_accuracy: 均值/占比=0.6007, 缺失率=0.00%
+    - turns: mean=1.2667, std=1.0373, median=1.0000
+    - user_tokens: mean=132.2031, std=629.8517, median=29.0000
+    - verbosity_diff: mean=0.3199, std=689.1639, median=0.0000
+  结果层：1 个变量
+    - winner_a: 均值/占比=0.4945, 缺失率=0.00%
+
+【模型语法】
+  主模型：
+    token_diff_ab ~ ability_diff + verbosity_diff + format_tendency_diff + user_tokens + turns + creative_writing_bool + if_bool + math_bool + code_bool + complexity + creativity + domain_knowledge + problem_solving + real_world + specificity + technical_accuracy
+    header_density_diff ~ ability_diff + verbosity_diff + format_tendency_diff + user_tokens + turns + creative_writing_bool + if_bool + math_bool + code_bool + complexity + creativity + domain_knowledge + problem_solving + real_world + specificity + technical_accuracy + token_diff_ab
+    bold_density_diff ~ ability_diff + verbosity_diff + format_tendency_diff + user_tokens + turns + creative_writing_bool + if_bool + math_bool + code_bool + complexity + creativity + domain_knowledge + problem_solving + real_world + specificity + technical_accuracy + token_diff_ab
+    winner_a ~ ability_diff + verbosity_diff + format_tendency_diff + user_tokens + turns + creative_writing_bool + if_bool + math_bool + code_bool + complexity + creativity + domain_knowledge + problem_solving + real_world + specificity + technical_accuracy + token_diff_ab + header_density_diff + bold_density_diff
+    header_density_diff ~~ bold_density_diff
+  扩展模型：
+    token_diff_ab ~ ability_diff + verbosity_diff + format_tendency_diff + user_tokens + turns + creative_writing_bool + if_bool + math_bool + code_bool + complexity + creativity + domain_knowledge + problem_solving + real_world + specificity + technical_accuracy
+    header_density_diff ~ ability_diff + verbosity_diff + format_tendency_diff + user_tokens + turns + creative_writing_bool + if_bool + math_bool + code_bool + complexity + creativity + domain_knowledge + problem_solving + real_world + specificity + technical_accuracy + token_diff_ab
+    bold_density_diff ~ ability_diff + verbosity_diff + format_tendency_diff + user_tokens + turns + creative_writing_bool + if_bool + math_bool + code_bool + complexity + creativity + domain_knowledge + problem_solving + real_world + specificity + technical_accuracy + token_diff_ab
+    list_density_diff ~ ability_diff + verbosity_diff + format_tendency_diff + user_tokens + turns + creative_writing_bool + if_bool + math_bool + code_bool + complexity + creativity + domain_knowledge + problem_solving + real_world + specificity + technical_accuracy + token_diff_ab
+    winner_a ~ ability_diff + verbosity_diff + format_tendency_diff + user_tokens + turns + creative_writing_bool + if_bool + math_bool + code_bool + complexity + creativity + domain_knowledge + problem_solving + real_world + specificity + technical_accuracy + token_diff_ab + header_density_diff + bold_density_diff + list_density_diff
+    header_density_diff ~~ bold_density_diff
+    header_density_diff ~~ list_density_diff
+    bold_density_diff ~~ list_density_diff
+
+【模型比较】
+  主模型: CFI=0.9998, TLI=0.9998, RMSEA=0.0030, AIC=111.36, BIC=797.85
+  扩展模型: CFI=1.0000, TLI=1.0000, RMSEA=0.0012, AIC=183.32, BIC=1064.62
+  解释：主模型用于正式结论；扩展模型用于检验 list_density_diff 是否改变主路径。
+
+【主模型关键路径估计】
+  token_diff_ab ~ ability_diff: Estimate=-0.0221, SE=0.0011, p=0
+  token_diff_ab ~ verbosity_diff: Estimate=0.5017, SE=0.0015, p=0
+  token_diff_ab ~ format_tendency_diff: Estimate=-0.0266, SE=0.0012, p=0
+  token_diff_ab ~ user_tokens: Estimate=-0.0199, SE=0.0007, p=0
+  token_diff_ab ~ turns: Estimate=0.0186, SE=0.0007, p=0
+  token_diff_ab ~ creative_writing_bool: Estimate=0.0049, SE=0.0027, p=0.07255
+  token_diff_ab ~ if_bool: Estimate=-0.0029, SE=0.0021, p=0.1633
+  token_diff_ab ~ math_bool: Estimate=-0.0315, SE=0.0028, p=0
+  token_diff_ab ~ code_bool: Estimate=0.0003, SE=0.0018, p=0.8776
+  token_diff_ab ~ complexity: Estimate=0.0058, SE=0.0017, p=0.0007674
+  token_diff_ab ~ creativity: Estimate=0.0018, SE=0.0018, p=0.3224
+  token_diff_ab ~ domain_knowledge: Estimate=-0.0052, SE=0.0022, p=0.01862
+  token_diff_ab ~ problem_solving: Estimate=-0.0130, SE=0.0020, p=7.578e-11
+  token_diff_ab ~ real_world: Estimate=0.0093, SE=0.0019, p=1.243e-06
+  token_diff_ab ~ specificity: Estimate=0.0049, SE=0.0020, p=0.01514
+  token_diff_ab ~ technical_accuracy: Estimate=0.0042, SE=0.0020, p=0.03258
+  header_density_diff ~ ability_diff: Estimate=0.3502, SE=0.0050, p=0
+  header_density_diff ~ verbosity_diff: Estimate=-0.8057, SE=0.0110, p=0
+  header_density_diff ~ format_tendency_diff: Estimate=0.6551, SE=0.0058, p=0
+  header_density_diff ~ user_tokens: Estimate=-0.0022, SE=0.0033, p=0.5176
+  header_density_diff ~ turns: Estimate=0.0004, SE=0.0033, p=0.8936
+  header_density_diff ~ creative_writing_bool: Estimate=-0.0094, SE=0.0127, p=0.4606
+  header_density_diff ~ if_bool: Estimate=0.0017, SE=0.0098, p=0.8626
+  header_density_diff ~ math_bool: Estimate=0.0015, SE=0.0131, p=0.9096
+  header_density_diff ~ code_bool: Estimate=-0.0084, SE=0.0083, p=0.3112
+  header_density_diff ~ complexity: Estimate=0.0017, SE=0.0081, p=0.8381
+  header_density_diff ~ creativity: Estimate=-0.0143, SE=0.0083, p=0.08743
+  header_density_diff ~ domain_knowledge: Estimate=-0.0023, SE=0.0103, p=0.8208
+  header_density_diff ~ problem_solving: Estimate=0.0176, SE=0.0094, p=0.0612
+  header_density_diff ~ real_world: Estimate=-0.0000, SE=0.0090, p=0.9959
+  header_density_diff ~ specificity: Estimate=-0.0000, SE=0.0094, p=0.9998
+  header_density_diff ~ technical_accuracy: Estimate=0.0127, SE=0.0092, p=0.1662
+  header_density_diff ~ token_diff_ab: Estimate=-0.0052, SE=0.0167, p=0.7549
+  bold_density_diff ~ ability_diff: Estimate=0.1451, SE=0.0045, p=0
+  bold_density_diff ~ verbosity_diff: Estimate=-0.4816, SE=0.0100, p=0
+  bold_density_diff ~ format_tendency_diff: Estimate=0.8298, SE=0.0053, p=0
+  bold_density_diff ~ user_tokens: Estimate=-0.0039, SE=0.0030, p=0.2032
+  bold_density_diff ~ turns: Estimate=0.0021, SE=0.0030, p=0.4798
+  bold_density_diff ~ creative_writing_bool: Estimate=0.0007, SE=0.0116, p=0.9503
+  bold_density_diff ~ if_bool: Estimate=-0.0013, SE=0.0089, p=0.8862
+  bold_density_diff ~ math_bool: Estimate=-0.0387, SE=0.0120, p=0.001225
+  bold_density_diff ~ code_bool: Estimate=-0.0119, SE=0.0075, p=0.1136
+  bold_density_diff ~ complexity: Estimate=0.0055, SE=0.0074, p=0.4609
+  bold_density_diff ~ creativity: Estimate=-0.0086, SE=0.0076, p=0.2567
+  bold_density_diff ~ domain_knowledge: Estimate=0.0105, SE=0.0094, p=0.2627
+  bold_density_diff ~ problem_solving: Estimate=-0.0037, SE=0.0086, p=0.6695
+  bold_density_diff ~ real_world: Estimate=0.0048, SE=0.0082, p=0.5605
+  bold_density_diff ~ specificity: Estimate=0.0005, SE=0.0086, p=0.9531
+  bold_density_diff ~ technical_accuracy: Estimate=0.0024, SE=0.0084, p=0.7768
+  bold_density_diff ~ token_diff_ab: Estimate=-0.0177, SE=0.0152, p=0.2452
+  winner_a ~ ability_diff: Estimate=0.1554, SE=0.0026, p=0
+  winner_a ~ verbosity_diff: Estimate=-0.2645, SE=0.0058, p=0
+  winner_a ~ format_tendency_diff: Estimate=-0.0235, SE=0.0034, p=9.629e-12
+  winner_a ~ user_tokens: Estimate=0.0147, SE=0.0017, p=0
+  winner_a ~ turns: Estimate=-0.0121, SE=0.0017, p=3.257e-13
+  winner_a ~ creative_writing_bool: Estimate=-0.0108, SE=0.0064, p=0.09202
+  winner_a ~ if_bool: Estimate=0.0002, SE=0.0049, p=0.9739
+  winner_a ~ math_bool: Estimate=0.0284, SE=0.0066, p=1.828e-05
+  winner_a ~ code_bool: Estimate=0.0057, SE=0.0042, p=0.1677
+  winner_a ~ complexity: Estimate=-0.0064, SE=0.0041, p=0.1173
+  winner_a ~ creativity: Estimate=0.0010, SE=0.0042, p=0.8042
+  winner_a ~ domain_knowledge: Estimate=-0.0084, SE=0.0052, p=0.1056
+  winner_a ~ problem_solving: Estimate=0.0006, SE=0.0047, p=0.8942
+  winner_a ~ real_world: Estimate=-0.0173, SE=0.0045, p=0.0001444
+  winner_a ~ specificity: Estimate=0.0020, SE=0.0047, p=0.6701
+  winner_a ~ technical_accuracy: Estimate=-0.0048, SE=0.0046, p=0.3003
+  winner_a ~ token_diff_ab: Estimate=0.6147, SE=0.0084, p=0
+  winner_a ~ header_density_diff: Estimate=0.0173, SE=0.0018, p=0
+  winner_a ~ bold_density_diff: Estimate=0.0215, SE=0.0020, p=0
+
+【Bootstrap 95% 置信区间】
+  长度直接效应: 点估计=0.6147, 95% CI [-0.0506, 2.0109]，CI 跨 0
+  标题密度直接效应: 点估计=0.0173, 95% CI [0.0052, 0.0395]，CI 排除 0
+  粗体密度直接效应: 点估计=0.0215, 95% CI [0.0088, 0.0445]，CI 排除 0
+  能力直接效应: 点估计=0.1554, 95% CI [0.1171, 0.1955]，CI 排除 0
+  能力→长度→偏好: 点估计=-0.0136, 95% CI [-0.0556, 0.0091]，CI 跨 0
+  能力→标题密度→偏好: 点估计=0.0060, 95% CI [0.0018, 0.0136]，CI 排除 0
+  能力→粗体密度→偏好: 点估计=0.0031, 95% CI [0.0013, 0.0071]，CI 排除 0
+  能力总间接效应: 点估计=-0.0044, 95% CI [-0.0466, 0.0268]，CI 跨 0
+  能力总效应: 点估计=0.1510, 95% CI [0.1348, 0.1724]，CI 排除 0
+  词冗性→长度→偏好: 点估计=0.3084, 95% CI [-0.0235, 0.9769]，CI 跨 0
+  格式倾向直接效应: 点估计=-0.0235, 95% CI [-0.0954, 0.0238]，CI 跨 0
+  格式倾向→标题密度→偏好: 点估计=0.0113, 95% CI [0.0034, 0.0267]，CI 排除 0
+  格式倾向→粗体密度→偏好: 点估计=0.0179, 95% CI [0.0072, 0.0380]，CI 排除 0
+  格式倾向总间接效应: 点估计=0.0292, 95% CI [0.0129, 0.0599]，CI 排除 0
+
+【方法学结论】
+  1. 主模型将长度差与标题/粗体密度差作为并列中介，能够同时刻画内容冗长度与格式化程度对偏好的直接影响。
+  2. 扩展模型保留 list_density_diff 仅作敏感性分析，以避免将 C18 已识别的抑制效应直接写入主结论。
+  3. Bootstrap 置信区间用于补充 semopy 的正态近似标准误，尤其适合间接效应这类乘积项。
+  4. prompt-level 变量（任务类型与 criteria）在本模型中仅作为外生控制，不作为中介解释链条；它们同样来自 nested schema 的临时分析列。
+  5. 路径图已保存到 Pictures/P13_sem_path_diagram.png。
+
+================================================================================
+任务完成！
+================================================================================

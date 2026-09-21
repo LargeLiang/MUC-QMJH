@@ -1,0 +1,9 @@
+# Preserve checksum identity across Windows and Linux checkouts.
+Codes/** text eol=lf
+tests/** text eol=lf
+requirements-analysis.lock.txt text eol=lf
+# Numerical CSV, JSON manifests and archives must retain their original bytes.
+Reports/** -text
+Tables/** -text
+Pictures/** -text
+Legacy/** -text
